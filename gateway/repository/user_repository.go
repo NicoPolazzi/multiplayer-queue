@@ -1,8 +1,16 @@
 package repository
 
-import "github.com/NicoPolazzi/multiplayer-queue/gateway/models"
+import (
+	"errors"
+
+	"github.com/NicoPolazzi/multiplayer-queue/gateway/models"
+)
+
+var (
+	ErrUserExists = errors.New("user already exists in the database")
+)
 
 type UserRepository interface {
-	Create(user *models.User) error
+	Save(user *models.User) error
 	FindByUsername(username string) (*models.User, error)
 }

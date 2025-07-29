@@ -16,8 +16,13 @@ func NewGormUserRepository(db *gorm.DB) repository.UserRepository {
 	}
 }
 
-func (r *GormUserRepository) Create(user *models.User) error {
-	return r.DB.Create(user).Error
+func (r *GormUserRepository) Save(user *models.User) error {
+	if result := r.DB.Save(user); result.Error != nil {
+		return repository.ErrUserExists
+	} else {
+		return nil
+	}
+
 }
 
 func (r *GormUserRepository) FindByUsername(username string) (*models.User, error) {
