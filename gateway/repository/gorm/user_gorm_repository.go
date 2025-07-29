@@ -26,5 +26,7 @@ func (r *GormUserRepository) Save(user *models.User) error {
 }
 
 func (r *GormUserRepository) FindByUsername(username string) (*models.User, error) {
-	return &models.User{}, nil
+	var retrievedUser models.User
+	r.DB.Where(&models.User{Username: username}).First(&retrievedUser)
+	return &retrievedUser, nil
 }

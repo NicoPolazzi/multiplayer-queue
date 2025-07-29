@@ -33,13 +33,12 @@ func (s *TestSuite) SetupTest() {
 	s.Repository = NewGormUserRepository(s.DB)
 }
 
-func (s *TestSuite) TestSave() {
-	var retrieved models.User
+func (s *TestSuite) TestSaveWhenThereIsNotUser() {
+	var retrievedUser models.User
 	err := s.Repository.Save(&models.User{Username: "test", Password: "123"})
-	s.DB.First(&retrieved)
-
-	assert.Equal(s.T(), "test", retrieved.Username)
-	assert.Equal(s.T(), "123", retrieved.Password)
+	s.DB.First(&retrievedUser)
+	assert.Equal(s.T(), "test", retrievedUser.Username)
+	assert.Equal(s.T(), "123", retrievedUser.Password)
 	assert.Nil(s.T(), err)
 }
 
@@ -47,8 +46,15 @@ func (s *TestSuite) TestSaveShouldRaiseAnErrorWhenAnExistingUserIsPresent() {
 	existingUser := models.User{Username: "test", Password: "123"}
 	err := s.Repository.Save(&existingUser)
 	err = s.Repository.Save(&models.User{Username: "test", Password: "123"})
-
 	assert.ErrorIs(s.T(), err, repository.ErrUserExists)
+}
+
+func (s *TestSuite) TestFindByUserNameWhenThereIsAnUserShouldRetrieveTheUser() {
+	s.DB.Create(&models.User{Username: "test", Password: "123"})
+	retrievedUser, err := s.Repository.FindByUsername("test")
+	assert.Equal(s.T(), "test", retrievedUser.Username)
+	assert.Equal(s.T(), "123", retrievedUser.Password)
+	assert.Nil(s.T(), err)
 }
 
 func TestSuiteRun(t *testing.T) {
