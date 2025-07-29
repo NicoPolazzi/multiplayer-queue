@@ -1,6 +1,8 @@
 package gorm
 
 import (
+	"errors"
+
 	"github.com/NicoPolazzi/multiplayer-queue/gateway/models"
 	"github.com/NicoPolazzi/multiplayer-queue/gateway/repository"
 	"gorm.io/gorm"
@@ -27,6 +29,11 @@ func (r *GormUserRepository) Save(user *models.User) error {
 
 func (r *GormUserRepository) FindByUsername(username string) (*models.User, error) {
 	var retrievedUser models.User
-	r.DB.Where(&models.User{Username: username}).First(&retrievedUser)
+	result := r.DB.Where(&models.User{Username: username}).First(&retrievedUser)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, repository.ErrUserNotFound
+	}
+
 	return &retrievedUser, nil
 }

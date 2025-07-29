@@ -42,7 +42,7 @@ func (s *TestSuite) TestSaveWhenThereIsNotUser() {
 	assert.Nil(s.T(), err)
 }
 
-func (s *TestSuite) TestSaveShouldRaiseAnErrorWhenAnExistingUserIsPresent() {
+func (s *TestSuite) TestSaveWhenAnExistingUserIsPresentShouldRaiseAnError() {
 	existingUser := models.User{Username: "test", Password: "123"}
 	err := s.Repository.Save(&existingUser)
 	err = s.Repository.Save(&models.User{Username: "test", Password: "123"})
@@ -55,6 +55,12 @@ func (s *TestSuite) TestFindByUserNameWhenThereIsAnUserShouldRetrieveTheUser() {
 	assert.Equal(s.T(), "test", retrievedUser.Username)
 	assert.Equal(s.T(), "123", retrievedUser.Password)
 	assert.Nil(s.T(), err)
+}
+
+func (s *TestSuite) TestFindByUserNameWhenThereIsNotAnUserShouldThrowError() {
+	retrievedUser, err := s.Repository.FindByUsername("test")
+	assert.Nil(s.T(), retrievedUser)
+	assert.ErrorIs(s.T(), err, repository.ErrUserNotFound)
 }
 
 func TestSuiteRun(t *testing.T) {
