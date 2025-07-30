@@ -1,4 +1,4 @@
-package gorm
+package sqlrepo
 
 import (
 	"testing"
@@ -9,6 +9,11 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+)
+
+const (
+	UserFixtureUsername string = "test"
+	UserFixturePassword string = "123"
 )
 
 type TestSuite struct {
@@ -35,30 +40,30 @@ func (s *TestSuite) SetupTest() {
 
 func (s *TestSuite) TestSaveWhenThereIsNotUser() {
 	var retrievedUser models.User
-	err := s.Repository.Save(&models.User{Username: "test", Password: "123"})
+	err := s.Repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
 	s.DB.First(&retrievedUser)
-	assert.Equal(s.T(), "test", retrievedUser.Username)
-	assert.Equal(s.T(), "123", retrievedUser.Password)
+	assert.Equal(s.T(), UserFixtureUsername, retrievedUser.Username)
+	assert.Equal(s.T(), UserFixturePassword, retrievedUser.Password)
 	assert.Nil(s.T(), err)
 }
 
 func (s *TestSuite) TestSaveWhenAnExistingUserIsPresentShouldRaiseAnError() {
-	existingUser := models.User{Username: "test", Password: "123"}
-	err := s.Repository.Save(&existingUser)
-	err = s.Repository.Save(&models.User{Username: "test", Password: "123"})
+	existingUser := models.User{Username: UserFixtureUsername, Password: UserFixturePassword}
+	err := s.DB.Create(&existingUser).Error
+	err = s.Repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
 	assert.ErrorIs(s.T(), err, repository.ErrUserExists)
 }
 
 func (s *TestSuite) TestFindByUsernameWhenThereIsAnUserShouldRetrieveTheUser() {
-	s.DB.Create(&models.User{Username: "test", Password: "123"})
-	retrievedUser, err := s.Repository.FindByUsername("test")
-	assert.Equal(s.T(), "test", retrievedUser.Username)
-	assert.Equal(s.T(), "123", retrievedUser.Password)
+	s.DB.Create(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
+	retrievedUser, err := s.Repository.FindByUsername(UserFixtureUsername)
+	assert.Equal(s.T(), UserFixtureUsername, retrievedUser.Username)
+	assert.Equal(s.T(), UserFixturePassword, retrievedUser.Password)
 	assert.Nil(s.T(), err)
 }
 
 func (s *TestSuite) TestFindByUsernameWhenThereIsNotAnUserShouldThrowError() {
-	retrievedUser, err := s.Repository.FindByUsername("test")
+	retrievedUser, err := s.Repository.FindByUsername(UserFixtureUsername)
 	assert.Nil(s.T(), retrievedUser)
 	assert.ErrorIs(s.T(), err, repository.ErrUserNotFound)
 }

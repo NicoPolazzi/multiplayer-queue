@@ -12,19 +12,22 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+	UserFixtureUsername string = "test"
+	UserFixturePassword string = "123"
+)
+
 type AuthServiceTestSuite struct {
 	suite.Suite
+	Repository *UserTestRepository
+	*AuthService
 }
 
-// This is the strandard behaviour of creating a mock object with testify
 type UserTestRepository struct {
 	mock.Mock
 }
 
-// These calls work with setting up an On and Return before actually the real methods are called
-// in the program
 func (r *UserTestRepository) Save(user *models.User) error {
-	// Tells the mock object that the method has been called.
 	args := r.Called(user)
 	return args.Error(0)
 }
@@ -37,36 +40,27 @@ func (r *UserTestRepository) FindByUsername(username string) (*models.User, erro
 	return nil, args.Error(1)
 }
 
+func (s *AuthServiceTestSuite) SetupTest() {
+	s.Repository = new(UserTestRepository)
+	s.AuthService = NewAuthService(s.Repository)
+}
+
 func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {
-	username := "test"
-	password := "123"
-
-	testRepository := new(UserTestRepository)
-
 	mock.InOrder(
-		testRepository.On("FindByUsername", username).Return(nil, repository.ErrUserNotFound),
-		testRepository.On("Save", mock.MatchedBy(func(user *models.User) bool {
-			return bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) == nil
+		s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, repository.ErrUserNotFound),
+		s.Repository.On("Save", mock.MatchedBy(func(user *models.User) bool {
+			return bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(UserFixturePassword)) == nil
 		})).Return(nil),
 	)
 
-	authService := NewAuthService(testRepository)
-	err := authService.Register(username, password)
-
+	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
 	assert.Nil(s.T(), err)
-	testRepository.AssertExpectations(s.T())
+	s.Repository.AssertExpectations(s.T())
 }
 
 func (s *AuthServiceTestSuite) TestRegisterWhenThereIsAlreadyAnUserShouldRaiseAnError() {
-	username := "test"
-	password := "123"
-
-	testRepository := new(UserTestRepository)
-
-	testRepository.On("FindByUsername", username).Return(mock.AnythingOfType("*models.User"), nil)
-	authService := NewAuthService(testRepository)
-	err := authService.Register(username, password)
-
+	s.Repository.On("FindByUsername", UserFixtureUsername).Return(mock.AnythingOfType("*models.User"), nil)
+	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
 	assert.ErrorIs(s.T(), err, ErrUsernameTaken)
 }
 
