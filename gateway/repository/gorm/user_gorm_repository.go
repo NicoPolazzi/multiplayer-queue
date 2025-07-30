@@ -24,7 +24,6 @@ func (r *GormUserRepository) Save(user *models.User) error {
 	} else {
 		return nil
 	}
-
 }
 
 func (r *GormUserRepository) FindByUsername(username string) (*models.User, error) {
