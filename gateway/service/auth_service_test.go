@@ -37,7 +37,7 @@ func (r *UserTestRepository) FindByUsername(username string) (*models.User, erro
 	return nil, args.Error(1)
 }
 
-func (s *AuthServiceTestSuite) TestRegisterSuccess() {
+func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {
 	username := "test"
 	password := "123"
 
@@ -55,6 +55,19 @@ func (s *AuthServiceTestSuite) TestRegisterSuccess() {
 
 	assert.Nil(s.T(), err)
 	testRepository.AssertExpectations(s.T())
+}
+
+func (s *AuthServiceTestSuite) TestRegisterWhenThereIsAlreadyAnUserShouldRaiseAnError() {
+	username := "test"
+	password := "123"
+
+	testRepository := new(UserTestRepository)
+
+	testRepository.On("FindByUsername", username).Return(mock.AnythingOfType("*models.User"), nil)
+	authService := NewAuthService(testRepository)
+	err := authService.Register(username, password)
+
+	assert.ErrorIs(s.T(), err, ErrUsernameTaken)
 }
 
 func TestSuiteRun(t *testing.T) {

@@ -8,6 +8,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+var (
+	ErrUsernameTaken = errors.New("username already taken")
+)
+
 type AuthService struct {
 	UserRepository repository.UserRepository
 }
@@ -17,10 +21,12 @@ func NewAuthService(repository repository.UserRepository) *AuthService {
 }
 
 func (s *AuthService) Register(username, password string) error {
+	_, err := s.UserRepository.FindByUsername(username)
 
-	if _, err := s.UserRepository.FindByUsername(username); errors.Is(err, repository.ErrUserNotFound) {
-		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		s.UserRepository.Save(&models.User{Username: username, Password: string(hashedPassword)})
+	if err == nil {
+		return ErrUsernameTaken
 	}
-	return nil
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return s.UserRepository.Save(&models.User{Username: username, Password: string(hashedPassword)})
 }
