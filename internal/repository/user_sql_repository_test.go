@@ -1,10 +1,9 @@
-package sqlrepo
+package repository
 
 import (
 	"testing"
 
-	"github.com/NicoPolazzi/multiplayer-queue/gateway/models"
-	"github.com/NicoPolazzi/multiplayer-queue/gateway/repository"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/sqlite"
@@ -19,7 +18,7 @@ const (
 type TestSuite struct {
 	suite.Suite
 	DB         *gorm.DB
-	Repository repository.UserRepository
+	Repository UserRepository
 }
 
 func (s *TestSuite) SetupSuite() {
@@ -51,7 +50,7 @@ func (s *TestSuite) TestSaveWhenAnExistingUserIsPresentShouldRaiseAnError() {
 	existingUser := models.User{Username: UserFixtureUsername, Password: UserFixturePassword}
 	err := s.DB.Create(&existingUser).Error
 	err = s.Repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
-	assert.ErrorIs(s.T(), err, repository.ErrUserExists)
+	assert.ErrorIs(s.T(), err, ErrUserExists)
 }
 
 func (s *TestSuite) TestFindByUsernameWhenThereIsAnUserShouldRetrieveTheUser() {
@@ -65,7 +64,7 @@ func (s *TestSuite) TestFindByUsernameWhenThereIsAnUserShouldRetrieveTheUser() {
 func (s *TestSuite) TestFindByUsernameWhenThereIsNotAnUserShouldThrowError() {
 	retrievedUser, err := s.Repository.FindByUsername(UserFixtureUsername)
 	assert.Nil(s.T(), retrievedUser)
-	assert.ErrorIs(s.T(), err, repository.ErrUserNotFound)
+	assert.ErrorIs(s.T(), err, ErrUserNotFound)
 }
 
 func TestUserSQLRepository(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/NicoPolazzi/multiplayer-queue/gateway/models"
-	"github.com/NicoPolazzi/multiplayer-queue/gateway/repository"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

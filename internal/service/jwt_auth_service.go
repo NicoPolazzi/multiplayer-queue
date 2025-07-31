@@ -4,21 +4,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/NicoPolazzi/multiplayer-queue/gateway/models"
-	"github.com/NicoPolazzi/multiplayer-queue/gateway/repository"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
-
-var (
-	ErrUsernameTaken      = errors.New("username already taken")
-	ErrInvalidCredentials = errors.New("invalid username or password")
-)
-
-type AuthService interface {
-	Register(username, password string) error
-	Login(username, password string) (string, error)
-}
 
 type jwtAuthService struct {
 	userRepository repository.UserRepository
@@ -30,9 +20,7 @@ func NewJWTAuthService(repository repository.UserRepository, key []byte) AuthSer
 }
 
 func (s *jwtAuthService) Register(username, password string) error {
-	_, err := s.userRepository.FindByUsername(username)
-
-	if err == nil {
+	if _, err := s.userRepository.FindByUsername(username); err == nil {
 		return ErrUsernameTaken
 	}
 
@@ -42,7 +30,6 @@ func (s *jwtAuthService) Register(username, password string) error {
 
 func (s *jwtAuthService) Login(username, password string) (string, error) {
 	user, err := s.userRepository.FindByUsername(username)
-
 	if errors.Is(err, repository.ErrUserNotFound) {
 		return "", ErrInvalidCredentials
 	}
@@ -52,12 +39,16 @@ func (s *jwtAuthService) Login(username, password string) (string, error) {
 		return "", ErrInvalidCredentials
 	}
 
+	return s.createJWTToken(user)
+}
+
+func (s *jwtAuthService) createJWTToken(user *models.User) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": user.Username,
 		"exp": time.Now().Add(time.Hour * 24).Unix(),
 	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	result, _ := token.SignedString(s.key)
-	return result, nil
+	return token.SignedString(s.key)
 }

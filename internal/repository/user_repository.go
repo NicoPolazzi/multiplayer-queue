@@ -3,7 +3,7 @@ package repository
 import (
 	"errors"
 
-	"github.com/NicoPolazzi/multiplayer-queue/gateway/models"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 )
 
 var (
