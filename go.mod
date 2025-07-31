@@ -8,6 +8,8 @@ require (
 	gorm.io/gorm v1.30.1
 )
 
+require github.com/golang-jwt/jwt/v5 v5.3.0
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect

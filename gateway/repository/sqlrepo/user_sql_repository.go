@@ -8,17 +8,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type SqlUserRepository struct {
+type sqlUserRepository struct {
 	DB *gorm.DB
 }
 
-func NewGormUserRepository(db *gorm.DB) repository.UserRepository {
-	return &SqlUserRepository{
+func NewSQLUserRepository(db *gorm.DB) repository.UserRepository {
+	return &sqlUserRepository{
 		DB: db,
 	}
 }
 
-func (r *SqlUserRepository) Save(user *models.User) error {
+func (r *sqlUserRepository) Save(user *models.User) error {
 	if result := r.DB.Save(user); result.Error != nil {
 		return repository.ErrUserExists
 	} else {
@@ -26,7 +26,7 @@ func (r *SqlUserRepository) Save(user *models.User) error {
 	}
 }
 
-func (r *SqlUserRepository) FindByUsername(username string) (*models.User, error) {
+func (r *sqlUserRepository) FindByUsername(username string) (*models.User, error) {
 	var retrievedUser models.User
 	result := r.DB.Where(&models.User{Username: username}).First(&retrievedUser)
 

@@ -35,7 +35,7 @@ func (s *TestSuite) TearDownSuite() {
 func (s *TestSuite) SetupTest() {
 	s.DB.Migrator().DropTable(&models.User{})
 	s.DB.AutoMigrate(&models.User{})
-	s.Repository = NewGormUserRepository(s.DB)
+	s.Repository = NewSQLUserRepository(s.DB)
 }
 
 func (s *TestSuite) TestSaveWhenThereIsNotUser() {
@@ -68,6 +68,6 @@ func (s *TestSuite) TestFindByUsernameWhenThereIsNotAnUserShouldThrowError() {
 	assert.ErrorIs(s.T(), err, repository.ErrUserNotFound)
 }
 
-func TestSuiteRun(t *testing.T) {
+func TestUserSQLRepository(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }
