@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 const (
@@ -33,9 +34,24 @@ func (m *MockAuthService) Login(username, password string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func TestRegisterHandler(t *testing.T) {
-	gin.SetMode(gin.TestMode)
+type AuthHandlerTestSuite struct {
+	suite.Suite
+	mockService *MockAuthService
+	handler     *AuthHandler
+	recorder    *httptest.ResponseRecorder
+	context     *gin.Context
+}
 
+func (s *AuthHandlerTestSuite) SetupTest() {
+	gin.SetMode(gin.TestMode)
+	s.recorder = httptest.NewRecorder()
+	s.context, _ = gin.CreateTestContext(s.recorder)
+
+	s.mockService = new(MockAuthService)
+	s.handler = NewAuthHandler(s.mockService)
+}
+
+func (s *AuthHandlerTestSuite) TestRegisterHandler() {
 	tests := []struct {
 		name         string
 		serviceError error
@@ -56,6 +72,63 @@ func TestRegisterHandler(t *testing.T) {
 		},
 		{
 			name:         "server error",
+			serviceError: errors.New("internal error"),
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"status": "error", "message": "Internal server error"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.SetupTest()
+			s.setupRequest("POST", "/auth/register", gin.H{
+				"username": UserFixtureUsername,
+				"password": UserFixturePassword,
+			})
+			s.mockService.On("Register", UserFixtureUsername, UserFixturePassword).Return(tt.serviceError)
+
+			s.handler.Register(s.context)
+
+			assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
+			assert.JSONEq(s.T(), tt.expectedBody, s.recorder.Body.String())
+			s.mockService.AssertExpectations(s.T())
+		})
+	}
+}
+
+func (s *AuthHandlerTestSuite) setupRequest(method, path string, body map[string]any) {
+	requestBody, _ := json.Marshal(body)
+	s.context.Request = httptest.NewRequest(method, path, bytes.NewBuffer(requestBody))
+	s.context.Request.Header.Set("Content-Type", "application/json")
+}
+
+func (s *AuthHandlerTestSuite) TestLoginHandler() {
+	testToken := "test-token"
+
+	tests := []struct {
+		name         string
+		serviceToken string
+		serviceError error
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "successful login",
+			serviceToken: testToken,
+			serviceError: nil,
+			expectedCode: http.StatusOK,
+			expectedBody: `{"status": "success", "token": "` + testToken + `"}`,
+		},
+		{
+			name:         "invalid credentials",
+			serviceToken: "",
+			serviceError: service.ErrInvalidCredentials,
+			expectedCode: http.StatusUnauthorized,
+			expectedBody: `{"status": "error", "message": "Invalid username or password"}`,
+		},
+		{
+			name:         "server error",
+			serviceToken: "",
 			serviceError: errors.New("some internal error"),
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: `{"status": "error", "message": "Internal server error"}`,
@@ -63,28 +136,23 @@ func TestRegisterHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			ctx, _ := gin.CreateTestContext(w)
-
-			requestBody, _ := json.Marshal(gin.H{
+		s.Run(tt.name, func() {
+			s.SetupTest()
+			s.setupRequest("POST", "/auth/login", gin.H{
 				"username": UserFixtureUsername,
 				"password": UserFixturePassword,
 			})
+			s.mockService.On("Login", UserFixtureUsername, UserFixturePassword).Return(tt.serviceToken, tt.serviceError)
 
-			ctx.Request = httptest.NewRequest("POST", "/auth/register", bytes.NewBuffer(requestBody))
-			ctx.Request.Header.Set("Content-Type", "application/json")
+			s.handler.Login(s.context)
 
-			mockService := new(MockAuthService)
-			mockService.On("Register", UserFixtureUsername, UserFixturePassword).Return(tt.serviceError)
-			handler := NewAuthHandler(mockService)
-
-			handler.Register(ctx)
-
-			var response map[string]any
-			err := json.Unmarshal([]byte(w.Body.String()), &response)
-			assert.NoError(t, err)
-			assert.JSONEq(t, tt.expectedBody, w.Body.String())
+			assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
+			assert.JSONEq(s.T(), tt.expectedBody, s.recorder.Body.String())
+			s.mockService.AssertExpectations(s.T())
 		})
 	}
+}
+
+func TestAuthHandlerSuite(t *testing.T) {
+	suite.Run(t, new(AuthHandlerTestSuite))
 }
