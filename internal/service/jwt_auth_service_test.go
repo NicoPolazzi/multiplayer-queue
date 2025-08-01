@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -60,11 +61,25 @@ func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSu
 	s.Repository.AssertExpectations(s.T())
 }
 
-func (s *AuthServiceTestSuite) TestRegisterWhenThereIsAlreadyAnUserShouldRaiseAnError() {
+func (s *AuthServiceTestSuite) TestRegisterWhenThereIsAlreadyAnUserShouldRaiseUsernameTakenError() {
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(mock.AnythingOfType("*models.User"), nil)
 	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
 	assert.ErrorIs(s.T(), err, ErrUsernameTaken)
+}
+
+func (s *AuthServiceTestSuite) TestRegisterOnHashErrorShouldFail() {
+	// This is necessary to let other tests to use the regular function
+	originalBcryptGenerate := bcryptGenerate
+	defer func() { bcryptGenerate = originalBcryptGenerate }()
+	bcryptGenerate = func(password []byte, cost int) ([]byte, error) {
+		return nil, errors.New("mock hash failure")
+	}
+
+	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, repository.ErrUserNotFound)
+	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
+	s.Repository.AssertExpectations(s.T())
+	assert.Error(s.T(), err)
 }
 
 func (s *AuthServiceTestSuite) TestLoginSuccess() {

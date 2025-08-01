@@ -10,6 +10,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// package-level variable used for test purpose only. This is necessary because I don't want to mock the hasher.
+var bcryptGenerate = bcrypt.GenerateFromPassword
+
 type jwtAuthService struct {
 	userRepository repository.UserRepository
 	key            []byte
@@ -24,7 +27,11 @@ func (s *jwtAuthService) Register(username, password string) error {
 		return ErrUsernameTaken
 	}
 
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashedPassword, err := bcryptGenerate([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
 	return s.userRepository.Save(&models.User{Username: username, Password: string(hashedPassword)})
 }
 
