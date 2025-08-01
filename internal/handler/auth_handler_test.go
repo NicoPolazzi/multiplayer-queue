@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+)
+
+const (
+	UserFixtureUsername string = "test"
+	UserFixturePassword string = "password123"
 )
 
 type MockAuthService struct {
@@ -27,49 +33,58 @@ func (m *MockAuthService) Login(username, password string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func TestRegisterHandlerSuccess(t *testing.T) {
+func TestRegisterHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
 
-	requestBody, _ := json.Marshal(gin.H{"username": "testuser", "password": "password123"})
+	tests := []struct {
+		name         string
+		serviceError error
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "successful registration",
+			serviceError: nil,
+			expectedCode: http.StatusOK,
+			expectedBody: `{"status": "success", "message": "User registered successfully"}`,
+		},
+		{
+			name:         "username taken",
+			serviceError: service.ErrUsernameTaken,
+			expectedCode: http.StatusConflict,
+			expectedBody: `{"status": "error", "message": "Username already taken"}`,
+		},
+		{
+			name:         "server error",
+			serviceError: errors.New("some internal error"),
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"status": "error", "message": "Internal server error"}`,
+		},
+	}
 
-	ctx.Request = httptest.NewRequest("POST", "/auth/register", bytes.NewBuffer(requestBody))
-	ctx.Request.Header.Set("Content-Type", "application/json")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(w)
 
-	service := new(MockAuthService)
-	service.On("Register", "testuser", "password123").Return(nil)
-	handler := NewAuthHandler(service)
+			requestBody, _ := json.Marshal(gin.H{
+				"username": UserFixtureUsername,
+				"password": UserFixturePassword,
+			})
 
-	handler.Register(ctx)
+			ctx.Request = httptest.NewRequest("POST", "/auth/register", bytes.NewBuffer(requestBody))
+			ctx.Request.Header.Set("Content-Type", "application/json")
 
-	assert.EqualValues(t, http.StatusOK, w.Code)
-	service.AssertExpectations(t)
+			mockService := new(MockAuthService)
+			mockService.On("Register", UserFixtureUsername, UserFixturePassword).Return(tt.serviceError)
+			handler := NewAuthHandler(mockService)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, "success", response["status"])
-}
+			handler.Register(ctx)
 
-func TestRegisterWhenAnUserAlreadyExistsShouldFail(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	requestBody, _ := json.Marshal(gin.H{"username": "testuser", "password": "password123"})
-	ctx.Request = httptest.NewRequest("POST", "/auth/register", bytes.NewBuffer(requestBody))
-	ctx.Request.Header.Set("Content-Type", "application/json")
-
-	authService := new(MockAuthService)
-	authService.On("Register", "testuser", "password123").Return(service.ErrUsernameTaken)
-	handler := NewAuthHandler(authService)
-
-	handler.Register(ctx)
-	authService.AssertExpectations(t)
-	assert.EqualValues(t, http.StatusConflict, w.Code)
-
-	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Equal(t, "error", response["status"])
-	assert.Equal(t, "Username already taken", response["message"])
+			var response map[string]any
+			err := json.Unmarshal([]byte(w.Body.String()), &response)
+			assert.NoError(t, err)
+			assert.JSONEq(t, tt.expectedBody, w.Body.String())
+		})
+	}
 }

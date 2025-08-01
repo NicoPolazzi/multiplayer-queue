@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
@@ -25,8 +26,18 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.ShouldBindJSON(&request)
 
 	err := h.authService.Register(request.Username, request.Password)
-	if err == service.ErrUsernameTaken {
-		c.JSON(http.StatusConflict, gin.H{"status": "error", "message": "Username already taken"})
+	if err != nil {
+		if errors.Is(err, service.ErrUsernameTaken) {
+			c.JSON(http.StatusConflict, gin.H{
+				"status":  "error",
+				"message": "Username already taken",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Internal server error",
+			})
+		}
 		return
 	}
 
