@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -49,4 +50,26 @@ func TestRegisterHandlerSuccess(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "success", response["status"])
+}
+
+func TestRegisterWhenAnUserAlreadyExistsShouldFail(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	requestBody, _ := json.Marshal(gin.H{"username": "testuser", "password": "password123"})
+	ctx.Request = httptest.NewRequest("POST", "/auth/register", bytes.NewBuffer(requestBody))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	authService := new(MockAuthService)
+	authService.On("Register", "testuser", "password123").Return(service.ErrUsernameTaken)
+	handler := NewAuthHandler(authService)
+
+	handler.Register(ctx)
+	authService.AssertExpectations(t)
+	assert.EqualValues(t, http.StatusConflict, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Equal(t, "error", response["status"])
+	assert.Equal(t, "Username already taken", response["message"])
 }
