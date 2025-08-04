@@ -9,18 +9,27 @@ import (
 // package-level variable used for test purpose only.
 var signedString = (*jwt.Token).SignedString
 
-type JWTTokenManager struct {
+type claims struct {
+	Username string `json:"sub"`
+	jwt.RegisteredClaims
+}
+
+type jwtTokenManager struct {
 	secretKey []byte
 }
 
 func NewJWTTokenManager(secreteKey []byte) TokenManager {
-	return &JWTTokenManager{secretKey: secreteKey}
+	return &jwtTokenManager{secretKey: secreteKey}
 }
 
-func (j *JWTTokenManager) Create(username string, duration time.Duration) (string, error) {
-	claims := jwt.MapClaims{
-		"sub": username,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
+func (j *jwtTokenManager) Create(username string, duration time.Duration) (string, error) {
+	claims := claims{
+		Username: username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   username,
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -33,6 +42,14 @@ func (j *JWTTokenManager) Create(username string, duration time.Duration) (strin
 	return tokenString, nil
 }
 
-func (j *JWTTokenManager) Validate(token string) (string, error) {
-	panic("unimplemented")
+func (j *jwtTokenManager) Validate(tokenString string) (string, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &claims{}, func(t *jwt.Token) (any, error) {
+		return j.secretKey, nil
+	})
+
+	if err != nil || !token.Valid {
+		return "", ErrInvalidToken
+	}
+
+	return token.Claims.(*claims).Username, nil
 }

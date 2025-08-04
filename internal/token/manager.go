@@ -7,6 +7,7 @@ import (
 
 var (
 	ErrImpossibleCreation = errors.New("impossible to create token")
+	ErrInvalidToken       = errors.New("invalid token")
 )
 
 type TokenManager interface {

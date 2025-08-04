@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	UserFixtureUsername string = "test"
-	UserFixturePassword string = "password123"
+	userFixtureUsername string = "test"
+	userFixturePassword string = "password123"
 )
 
 type MockAuthService struct {
@@ -82,10 +82,10 @@ func (s *AuthHandlerTestSuite) TestRegisterHandler() {
 		s.Run(tt.name, func() {
 			s.SetupTest()
 			s.setupRequest("POST", "/auth/register", gin.H{
-				"username": UserFixtureUsername,
-				"password": UserFixturePassword,
+				"username": userFixtureUsername,
+				"password": userFixturePassword,
 			})
-			s.mockService.On("Register", UserFixtureUsername, UserFixturePassword).Return(tt.serviceError)
+			s.mockService.On("Register", userFixtureUsername, userFixturePassword).Return(tt.serviceError)
 
 			s.handler.Register(s.context)
 
@@ -139,10 +139,10 @@ func (s *AuthHandlerTestSuite) TestLoginHandler() {
 		s.Run(tt.name, func() {
 			s.SetupTest()
 			s.setupRequest("POST", "/auth/login", gin.H{
-				"username": UserFixtureUsername,
-				"password": UserFixturePassword,
+				"username": userFixtureUsername,
+				"password": userFixturePassword,
 			})
-			s.mockService.On("Login", UserFixtureUsername, UserFixturePassword).Return(tt.serviceToken, tt.serviceError)
+			s.mockService.On("Login", userFixtureUsername, userFixturePassword).Return(tt.serviceToken, tt.serviceError)
 
 			s.handler.Login(s.context)
 
