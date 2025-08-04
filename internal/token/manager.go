@@ -2,7 +2,6 @@ package token
 
 import (
 	"errors"
-	"time"
 )
 
 var (
@@ -11,7 +10,7 @@ var (
 )
 
 type TokenManager interface {
-	Create(username string, duration time.Duration) (string, error)
+	Create(username string) (string, error)
 
 	// Validates the token and returns the username
 	Validate(token string) (string, error)

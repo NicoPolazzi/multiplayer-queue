@@ -22,7 +22,7 @@ func NewJWTTokenManager(secreteKey []byte) TokenManager {
 	return &jwtTokenManager{secretKey: secreteKey}
 }
 
-func (j *jwtTokenManager) Create(username string, duration time.Duration) (string, error) {
+func (j *jwtTokenManager) Create(username string) (string, error) {
 	claims := claims{
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{

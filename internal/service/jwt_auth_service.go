@@ -2,11 +2,10 @@ package service
 
 import (
 	"errors"
-	"time"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -15,11 +14,15 @@ var bcryptGenerate = bcrypt.GenerateFromPassword
 
 type jwtAuthService struct {
 	userRepository repository.UserRepository
-	key            []byte
+	jwtManager     token.TokenManager
 }
 
-func NewJWTAuthService(repository repository.UserRepository, key []byte) AuthService {
-	return &jwtAuthService{userRepository: repository, key: key}
+func NewJWTAuthService(repository repository.UserRepository) AuthService {
+	return &jwtAuthService{userRepository: repository}
+}
+
+func (s *jwtAuthService) SetTokenManager(m token.TokenManager) {
+	s.jwtManager = m
 }
 
 func (s *jwtAuthService) Register(username, password string) error {
@@ -46,16 +49,5 @@ func (s *jwtAuthService) Login(username, password string) (string, error) {
 		return "", ErrInvalidCredentials
 	}
 
-	return s.createJWTToken(user)
-}
-
-func (s *jwtAuthService) createJWTToken(user *models.User) (string, error) {
-	claims := jwt.MapClaims{
-		"sub": user.Username,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	return token.SignedString(s.key)
+	return s.jwtManager.Create(username)
 }

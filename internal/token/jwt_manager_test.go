@@ -29,14 +29,14 @@ func (s *TokenManagerTestSuite) TestCreateWhenThereIsASigningErrorShouldNotCreat
 		return "", mockErr
 	}
 
-	tokenString, err := s.TokenManager.Create("testuser", time.Hour)
+	tokenString, err := s.TokenManager.Create("testuser")
 
 	s.ErrorIs(err, ErrImpossibleCreation)
 	s.Empty(tokenString)
 }
 
 func (s *TokenManagerTestSuite) TestCreateSuccess() {
-	tokenString, err := s.TokenManager.Create("testuser", time.Hour)
+	tokenString, err := s.TokenManager.Create("testuser")
 
 	s.NoError(err)
 	s.NotEmpty(tokenString)
