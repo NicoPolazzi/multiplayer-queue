@@ -6,9 +6,11 @@ import (
 	"os"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handler"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -28,12 +30,44 @@ func main() {
 	}
 
 	userRepo := repository.NewSQLUserRepository(db)
-	authService := service.NewJWTAuthService(userRepo, jwtSecret)
+	tokenManager := token.NewJWTTokenManager(jwtSecret)
+	authService := service.NewJWTAuthService(userRepo)
+	authService.(*service.JWTAuthService).SetTokenManager(tokenManager)
 	authHandler := handler.NewAuthHandler(authService)
 
 	r := gin.Default()
-	r.POST("/register", authHandler.Register)
+	r.LoadHTMLGlob("web/templates/*.html")
+
+	r.GET("/", func(c *gin.Context) {
+		if _, err := c.Cookie("jwt"); err == nil {
+			c.Redirect(http.StatusSeeOther, "/dashboard")
+			return
+		}
+
+		c.HTML(http.StatusOK, "base.html", gin.H{
+			"title":    "Home",
+			"template": "home",
+		})
+	})
+
+	r.GET("/login", authHandler.ShowLogin)
+	r.GET("/register", authHandler.ShowRegister)
 	r.POST("/login", authHandler.Login)
+	r.POST("/register", authHandler.Register)
+
+	protected := r.Group("/")
+	protected.Use(middleware.AuthMiddleware(tokenManager))
+	{
+		protected.GET("/dashboard", func(c *gin.Context) {
+			username := c.GetString("username")
+			c.HTML(http.StatusOK, "base.html", gin.H{
+				"title":    "Dashboard - Multiplayer Queue",
+				"username": username,
+				"template": "dashboard",
+			})
+		})
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

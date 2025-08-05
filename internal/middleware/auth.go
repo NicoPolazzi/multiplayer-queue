@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"github.com/gin-gonic/gin"
@@ -10,13 +9,13 @@ import (
 
 func AuthMiddleware(manager token.TokenManager) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		auth := ctx.GetHeader("Authorization")
-		if !strings.HasPrefix(auth, "Bearer ") {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"status": "error",
-				"message": "Invalid authorization format. Use: Bearer {token}"})
+		tokenString, err := ctx.Cookie("jwt")
+		if err != nil {
+			ctx.Redirect(http.StatusSeeOther, "/login")
+			ctx.Abort()
 			return
 		}
-		tokenString := strings.TrimPrefix(auth, "Bearer ")
+
 		username, err := manager.Validate(tokenString)
 
 		if err != nil {

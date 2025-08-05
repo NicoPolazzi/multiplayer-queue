@@ -39,13 +39,16 @@ func (s *AuthMiddlewareTestSuite) SetupTest() {
 	s.context, _ = gin.CreateTestContext(s.recorder)
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValidSucced() {
+func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValidSucceeds() {
 	validToken := "valid.token.string"
 	expectedUsername := "testuser"
 	s.tokenManager.On("Validate", validToken).Return(expectedUsername, nil)
 
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-	s.context.Request.Header.Set("Authorization", "Bearer "+validToken)
+	s.context.Request.AddCookie(&http.Cookie{
+		Name:  "jwt",
+		Value: validToken,
+	})
 
 	handler := AuthMiddleware(s.tokenManager)
 	handler(s.context)
@@ -55,21 +58,23 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValidSucced() {
 	s.Equal(expectedUsername, s.context.GetString("username"))
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenHeaderIsMissingAbortContext() {
+func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenCookieIsMissingAbortAndRedirectToLogin() {
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
 	handler := AuthMiddleware(s.tokenManager)
 	handler(s.context)
 	s.True(s.context.IsAborted())
-	s.Equal(http.StatusUnauthorized, s.recorder.Code)
-	s.JSONEq(`{"status": "error", "message": "Invalid authorization format. Use: Bearer {token}"}`,
-		s.recorder.Body.String())
+	s.Equal(http.StatusSeeOther, s.recorder.Code)
+	s.Equal("/login", s.recorder.Header().Get("Location"))
 }
 
 func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenRequestIsInvalidAbortContext() {
 	invalidToken := "invalidToken"
 	s.tokenManager.On("Validate", invalidToken).Return("", token.ErrInvalidToken)
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-	s.context.Request.Header.Set("Authorization", "Bearer "+invalidToken)
+	s.context.Request.AddCookie(&http.Cookie{
+		Name:  "jwt",
+		Value: invalidToken,
+	})
 
 	handler := AuthMiddleware(s.tokenManager)
 	handler(s.context)

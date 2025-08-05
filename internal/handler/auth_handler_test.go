@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,41 +41,42 @@ type AuthHandlerTestSuite struct {
 	handler     *AuthHandler
 	recorder    *httptest.ResponseRecorder
 	context     *gin.Context
+	router      *gin.Engine
 }
 
 func (s *AuthHandlerTestSuite) SetupTest() {
 	gin.SetMode(gin.TestMode)
 	s.recorder = httptest.NewRecorder()
-	s.context, _ = gin.CreateTestContext(s.recorder)
-
+	s.context, s.router = gin.CreateTestContext(s.recorder)
 	s.mockService = new(MockAuthService)
 	s.handler = NewAuthHandler(s.mockService)
 }
 
 func (s *AuthHandlerTestSuite) TestRegisterHandler() {
 	tests := []struct {
-		name         string
-		serviceError error
-		expectedCode int
-		expectedBody string
+		name             string
+		serviceError     error
+		expectedCode     int
+		expectedRedirect string
+		expectedError    string
 	}{
 		{
-			name:         "successful registration",
-			serviceError: nil,
-			expectedCode: http.StatusOK,
-			expectedBody: `{"status": "success", "message": "User registered successfully"}`,
+			name:             "successful registration",
+			serviceError:     nil,
+			expectedCode:     http.StatusSeeOther,
+			expectedRedirect: "/login",
 		},
 		{
-			name:         "username taken",
-			serviceError: service.ErrUsernameTaken,
-			expectedCode: http.StatusConflict,
-			expectedBody: `{"status": "error", "message": "Username already taken"}`,
+			name:          "username taken",
+			serviceError:  service.ErrUsernameTaken,
+			expectedCode:  http.StatusConflict,
+			expectedError: "Username already taken",
 		},
 		{
-			name:         "server error",
-			serviceError: errors.New("internal error"),
-			expectedCode: http.StatusInternalServerError,
-			expectedBody: `{"status": "error", "message": "Internal server error"}`,
+			name:          "server error",
+			serviceError:  errors.New("internal error"),
+			expectedCode:  http.StatusInternalServerError,
+			expectedError: "something went wrong",
 		},
 	}
 
@@ -89,8 +91,14 @@ func (s *AuthHandlerTestSuite) TestRegisterHandler() {
 
 			s.handler.Register(s.context)
 
-			assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
-			assert.JSONEq(s.T(), tt.expectedBody, s.recorder.Body.String())
+			if tt.expectedRedirect != "" {
+				assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
+				assert.Equal(s.T(), tt.expectedRedirect, s.recorder.Header().Get("Location"))
+			} else {
+				// Failure: an HTML response with an error message
+				assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
+				assert.Contains(s.T(), s.recorder.Body.String(), tt.expectedError)
+			}
 			s.mockService.AssertExpectations(s.T())
 		})
 	}
@@ -106,32 +114,33 @@ func (s *AuthHandlerTestSuite) TestLoginHandler() {
 	testToken := "test-token"
 
 	tests := []struct {
-		name         string
-		serviceToken string
-		serviceError error
-		expectedCode int
-		expectedBody string
+		name             string
+		serviceToken     string
+		serviceError     error
+		expectedCode     int
+		expectedRedirect string
+		expectedError    string
 	}{
 		{
-			name:         "successful login",
-			serviceToken: testToken,
-			serviceError: nil,
-			expectedCode: http.StatusOK,
-			expectedBody: `{"status": "success", "token": "` + testToken + `"}`,
+			name:             "successful login",
+			serviceToken:     testToken,
+			serviceError:     nil,
+			expectedCode:     http.StatusSeeOther,
+			expectedRedirect: "/dashboard",
 		},
 		{
-			name:         "invalid credentials",
-			serviceToken: "",
-			serviceError: service.ErrInvalidCredentials,
-			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"status": "error", "message": "Invalid username or password"}`,
+			name:          "invalid credentials",
+			serviceToken:  "",
+			serviceError:  service.ErrInvalidCredentials,
+			expectedCode:  http.StatusUnauthorized,
+			expectedError: "Invalid username or password",
 		},
 		{
-			name:         "server error",
-			serviceToken: "",
-			serviceError: errors.New("some internal error"),
-			expectedCode: http.StatusInternalServerError,
-			expectedBody: `{"status": "error", "message": "Internal server error"}`,
+			name:          "server error",
+			serviceToken:  "",
+			serviceError:  errors.New("some internal error"),
+			expectedCode:  http.StatusInternalServerError,
+			expectedError: "Something went wrong",
 		},
 	}
 
@@ -146,11 +155,72 @@ func (s *AuthHandlerTestSuite) TestLoginHandler() {
 
 			s.handler.Login(s.context)
 
-			assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
-			assert.JSONEq(s.T(), tt.expectedBody, s.recorder.Body.String())
+			if tt.expectedRedirect != "" {
+				assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
+				assert.Equal(s.T(), tt.expectedRedirect, s.recorder.Header().Get("Location"))
+				// Check the cookie
+				cookies := s.recorder.Result().Cookies()
+				found := false
+				for _, cookie := range cookies {
+					if cookie.Name == "jwt" && cookie.Value == testToken {
+						found = true
+						break
+					}
+				}
+				assert.True(s.T(), found, "jwt cookie was not set")
+			} else {
+				assert.Equal(s.T(), tt.expectedCode, s.recorder.Code)
+				assert.Contains(s.T(), s.recorder.Body.String(), tt.expectedError)
+			}
 			s.mockService.AssertExpectations(s.T())
 		})
 	}
+}
+
+func (s *AuthHandlerTestSuite) TestShowLogin() {
+	templ := template.Must(template.New("login.html").Parse(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Login</title>
+        </head>
+        <body>
+            <h2>Login</h2>
+            <form action="/login" method="POST">
+                <input name="username" placeholder="Username" required><br>
+                <input type="password" name="password" placeholder="Password" required><br>
+                <button type="submit">Login</button>
+            </form>
+        </body>
+        </html>
+    `))
+	s.router.SetHTMLTemplate(templ)
+	s.handler.ShowLogin(s.context)
+	assert.Equal(s.T(), http.StatusOK, s.recorder.Code)
+	assert.Contains(s.T(), s.recorder.Body.String(), "Login")
+}
+
+func (s *AuthHandlerTestSuite) TestShowRegister() {
+	templ := template.Must(template.New("register.html").Parse(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Register</title>
+        </head>
+        <body>
+            <h2>Register</h2>
+            <form action="/register" method="POST">
+                <input name="username" placeholder="Username" required><br>
+                <input type="password" name="password" placeholder="Password" required><br>
+                <button type="submit">Register</button>
+            </form>
+        </body>
+        </html>
+    `))
+	s.router.SetHTMLTemplate(templ)
+	s.handler.ShowRegister(s.context)
+	assert.Equal(s.T(), http.StatusOK, s.recorder.Code)
+	assert.Contains(s.T(), s.recorder.Body.String(), "Register")
 }
 
 func TestAuthHandlerSuite(t *testing.T) {

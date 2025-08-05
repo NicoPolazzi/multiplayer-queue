@@ -60,7 +60,7 @@ func (s *AuthServiceTestSuite) SetupTest() {
 	s.Repository = new(UserTestRepository)
 	s.AuthService = NewJWTAuthService(s.Repository)
 	s.Manager = new(TokenTestManager)
-	s.AuthService.(*jwtAuthService).SetTokenManager(s.Manager)
+	s.AuthService.(*JWTAuthService).SetTokenManager(s.Manager)
 }
 
 func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {

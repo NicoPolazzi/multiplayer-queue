@@ -12,20 +12,20 @@ import (
 // package-level variable used for test purpose only. This is necessary because I don't want to mock the hasher.
 var bcryptGenerate = bcrypt.GenerateFromPassword
 
-type jwtAuthService struct {
+type JWTAuthService struct {
 	userRepository repository.UserRepository
 	jwtManager     token.TokenManager
 }
 
 func NewJWTAuthService(repository repository.UserRepository) AuthService {
-	return &jwtAuthService{userRepository: repository}
+	return &JWTAuthService{userRepository: repository}
 }
 
-func (s *jwtAuthService) SetTokenManager(m token.TokenManager) {
+func (s *JWTAuthService) SetTokenManager(m token.TokenManager) {
 	s.jwtManager = m
 }
 
-func (s *jwtAuthService) Register(username, password string) error {
+func (s *JWTAuthService) Register(username, password string) error {
 	if _, err := s.userRepository.FindByUsername(username); err == nil {
 		return ErrUsernameTaken
 	}
@@ -38,7 +38,7 @@ func (s *jwtAuthService) Register(username, password string) error {
 	return s.userRepository.Save(&models.User{Username: username, Password: string(hashedPassword)})
 }
 
-func (s *jwtAuthService) Login(username, password string) (string, error) {
+func (s *JWTAuthService) Login(username, password string) (string, error) {
 	user, err := s.userRepository.FindByUsername(username)
 	if errors.Is(err, repository.ErrUserNotFound) {
 		return "", ErrInvalidCredentials
