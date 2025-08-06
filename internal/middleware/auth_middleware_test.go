@@ -50,7 +50,7 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValidSucceeds() {
 		Value: validToken,
 	})
 
-	handler := AuthMiddleware(s.tokenManager)
+	handler := CheckUser(s.tokenManager)
 	handler(s.context)
 
 	s.tokenManager.AssertExpectations(s.T())
@@ -60,7 +60,7 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValidSucceeds() {
 
 func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenCookieIsMissingAbortAndRedirectToLogin() {
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-	handler := AuthMiddleware(s.tokenManager)
+	handler := CheckUser(s.tokenManager)
 	handler(s.context)
 	s.True(s.context.IsAborted())
 	s.Equal(http.StatusSeeOther, s.recorder.Code)
@@ -76,7 +76,7 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenRequestIsInvalidAbortCon
 		Value: invalidToken,
 	})
 
-	handler := AuthMiddleware(s.tokenManager)
+	handler := CheckUser(s.tokenManager)
 	handler(s.context)
 
 	s.tokenManager.AssertExpectations(s.T())
