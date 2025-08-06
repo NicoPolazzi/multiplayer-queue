@@ -1,3 +1,5 @@
 covprofile
 
 test.db
+
+.env

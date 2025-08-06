@@ -3,13 +3,11 @@ package service
 import (
 	"errors"
 	"testing"
-	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -23,7 +21,22 @@ const (
 type AuthServiceTestSuite struct {
 	suite.Suite
 	Repository *UserTestRepository
+	Manager    *TokenTestManager
 	AuthService
+}
+
+type TokenTestManager struct {
+	mock.Mock
+}
+
+func (t *TokenTestManager) Create(username string) (string, error) {
+	args := t.Called(username)
+	return args.String(0), args.Error(1)
+}
+
+func (t *TokenTestManager) Validate(token string) (string, error) {
+	args := t.Called(token)
+	return args.String(0), args.Error(1)
 }
 
 type UserTestRepository struct {
@@ -45,7 +58,9 @@ func (r *UserTestRepository) FindByUsername(username string) (*models.User, erro
 
 func (s *AuthServiceTestSuite) SetupTest() {
 	s.Repository = new(UserTestRepository)
-	s.AuthService = NewJWTAuthService(s.Repository, []byte("test-secret"))
+	s.AuthService = NewJWTAuthService(s.Repository)
+	s.Manager = new(TokenTestManager)
+	s.AuthService.(*JWTAuthService).SetTokenManager(s.Manager)
 }
 
 func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {
@@ -86,19 +101,14 @@ func (s *AuthServiceTestSuite) TestLoginSuccess() {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(UserFixturePassword), bcrypt.DefaultCost)
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(
 		&models.User{Username: UserFixtureUsername, Password: string(hashedPassword)}, nil)
+	s.Manager.On("Create", UserFixtureUsername).Return("mock-jwt-token-value", nil)
 
 	token, err := s.AuthService.Login(UserFixtureUsername, UserFixturePassword)
 
-	claims := jwt.MapClaims{
-		"sub": UserFixtureUsername,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
-	}
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	expected, _ := t.SignedString([]byte("test-secret"))
-
 	s.Repository.AssertExpectations(s.T())
+	s.Manager.AssertExpectations(s.T())
 	assert.Nil(s.T(), err)
-	assert.Equal(s.T(), expected, token)
+	assert.Equal(s.T(), "mock-jwt-token-value", token)
 }
 
 func (s *AuthServiceTestSuite) TestLoginWhenUserIsNotFoundShouldReturnInvalidCredentialsError() {
