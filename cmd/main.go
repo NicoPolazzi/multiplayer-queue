@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
@@ -10,14 +11,22 @@ import (
 	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
-	// TODO: Place the secret key in an environment variable
-	jwtSecret := []byte("super-secret-key")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET not set in .env file")
+	}
+
+	key := []byte(jwtSecret)
 
 	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
 	if err != nil {
@@ -29,7 +38,7 @@ func main() {
 	}
 
 	userRepo := repository.NewSQLUserRepository(db)
-	tokenManager := token.NewJWTTokenManager(jwtSecret)
+	tokenManager := token.NewJWTTokenManager(key)
 	authService := service.NewJWTAuthService(userRepo)
 	authService.(*service.JWTAuthService).SetTokenManager(tokenManager)
 	userHandler := handlers.NewUserHandler(authService)
