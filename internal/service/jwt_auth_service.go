@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
+	repository "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"golang.org/x/crypto/bcrypt"
 )

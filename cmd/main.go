@@ -6,7 +6,7 @@ import (
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
+	repository "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/routes"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"

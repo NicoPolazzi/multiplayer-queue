@@ -14,24 +14,26 @@ func NewSQLLobbyRepository(db *gorm.DB) LobbyRepository {
 	return &sqlLobbyRepository{db: db}
 }
 
-func (s *sqlLobbyRepository) Create(lobby *models.Lobby) error {
-	if err := s.db.First(&models.User{}, lobby.CreatorID).Error; err != nil {
+func (r *sqlLobbyRepository) Create(lobby *models.Lobby) error {
+	if err := r.db.First(&models.User{}, lobby.CreatorID).Error; err != nil {
 		return usrrepo.ErrUserNotFound
 	}
 
-	if err := s.db.Create(lobby).Error; err != nil {
+	if err := r.db.Create(lobby).Error; err != nil {
 		return ErrLobbyExists
 	}
 	return nil
 }
 
 // FindByID implements LobbyRepository.
-func (s *sqlLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
-	panic("unimplemented")
+func (r *sqlLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
+	var retrievedLobby models.Lobby
+	r.db.Where(&models.Lobby{LobbyID: lobbyID}).First(&retrievedLobby)
+	return &retrievedLobby, nil
 }
 
 // Join implements LobbyRepository.
-func (s *sqlLobbyRepository) Join(lobbyID string, opponentID uint) error {
+func (r *sqlLobbyRepository) Join(lobbyID string, opponentID uint) error {
 	panic("unimplemented")
 }
 

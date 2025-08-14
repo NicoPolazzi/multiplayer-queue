@@ -7,7 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/repository"
+	repository "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
