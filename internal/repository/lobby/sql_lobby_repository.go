@@ -1,6 +1,8 @@
 package lobbyrepo
 
 import (
+	"errors"
+
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"gorm.io/gorm"
@@ -25,16 +27,29 @@ func (r *sqlLobbyRepository) Create(lobby *models.Lobby) error {
 	return nil
 }
 
-// FindByID implements LobbyRepository.
 func (r *sqlLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
 	var retrievedLobby models.Lobby
-	r.db.Where(&models.Lobby{LobbyID: lobbyID}).First(&retrievedLobby)
+	result := r.db.Where(&models.Lobby{LobbyID: lobbyID}).First(&retrievedLobby)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, ErrLobbyNotFound
+	}
 	return &retrievedLobby, nil
 }
 
-// Join implements LobbyRepository.
-func (r *sqlLobbyRepository) Join(lobbyID string, opponentID uint) error {
-	panic("unimplemented")
+func (r *sqlLobbyRepository) UpdateLobbyOpponentAndStatus(lobbyID string, opponentID uint, status models.LobbyStatus) error {
+	if err := r.db.First(&models.User{}, opponentID).Error; err != nil {
+		return usrrepo.ErrUserNotFound
+	}
+
+	result := r.db.Model(&models.Lobby{}).Where("lobby_id = ?", lobbyID).
+		Updates(map[string]any{"opponent_id": &opponentID, "status": status})
+
+	if result.RowsAffected == 0 {
+		return ErrLobbyNotFound
+	}
+
+	return nil
 }
 
 // ListAvailable implements LobbyRepository.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	usr "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
+	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -13,7 +14,9 @@ import (
 )
 
 const (
-	fixtureLobbyName string = "Test Lobby"
+	fixtureLobbyName    string = "Test Lobby"
+	fixtureUserUsername string = "test"
+	fixtureUserPassword string = "password123"
 )
 
 type LobbyRepositoryTestSuite struct {
@@ -38,7 +41,7 @@ func (s *LobbyRepositoryTestSuite) TearDownSuite() {
 }
 
 func (s *LobbyRepositoryTestSuite) SetupTest() {
-	if err := s.DB.Migrator().DropTable(&models.User{}); err != nil {
+	if err := s.DB.Migrator().DropTable(&models.User{}, &models.Lobby{}); err != nil {
 		s.T().Fatalf("Failed to drop User table before test run: %v", err)
 	}
 
@@ -50,8 +53,7 @@ func (s *LobbyRepositoryTestSuite) SetupTest() {
 }
 
 func (s *LobbyRepositoryTestSuite) TestCreateLobbyWhenThereIsNotAlreadyTheLobby() {
-	user := models.User{Username: "test", Password: "123"}
-	s.DB.Create(&user)
+	user := s.createTestUser(fixtureUserUsername, fixtureUserPassword)
 	lobby := &models.Lobby{
 		LobbyID:   uuid.New().String(),
 		Name:      fixtureLobbyName,
@@ -60,6 +62,12 @@ func (s *LobbyRepositoryTestSuite) TestCreateLobbyWhenThereIsNotAlreadyTheLobby(
 
 	err := s.Repository.Create(lobby)
 	assert.Nil(s.T(), err)
+}
+
+func (s *LobbyRepositoryTestSuite) createTestUser(username, password string) models.User {
+	user := models.User{Username: username, Password: password}
+	s.DB.Create(&user)
+	return user
 }
 
 func (s *LobbyRepositoryTestSuite) TestCreateLobbyWhenUserIsNotAlreadyPresentShouldReturnUserNotFoundError() {
@@ -74,8 +82,7 @@ func (s *LobbyRepositoryTestSuite) TestCreateLobbyWhenUserIsNotAlreadyPresentSho
 }
 
 func (s *LobbyRepositoryTestSuite) TestCreateLobbyWhenLobbyIsAlreadySavedShouldReturnLobbyExistsError() {
-	user := models.User{Username: "test", Password: "123"}
-	s.DB.Create(&user)
+	user := s.createTestUser(fixtureUserUsername, fixtureUserPassword)
 	lobby := &models.Lobby{
 		LobbyID:   uuid.New().String(),
 		Name:      fixtureLobbyName,
@@ -87,8 +94,7 @@ func (s *LobbyRepositoryTestSuite) TestCreateLobbyWhenLobbyIsAlreadySavedShouldR
 }
 
 func (s *LobbyRepositoryTestSuite) TestFindByIDShouldReturnTheLobby() {
-	user := models.User{Username: "test", Password: "123"}
-	s.DB.Create(&user)
+	user := s.createTestUser(fixtureUserUsername, fixtureUserPassword)
 	lobby := &models.Lobby{
 		LobbyID:   uuid.New().String(),
 		Name:      fixtureLobbyName,
@@ -100,6 +106,47 @@ func (s *LobbyRepositoryTestSuite) TestFindByIDShouldReturnTheLobby() {
 	s.Equal(fixtureLobbyName, found.Name)
 	s.Equal(user.ID, found.CreatorID)
 	s.NoError(err)
+}
+
+func (s *LobbyRepositoryTestSuite) TestFindByIDWhenThereIsNotAlreadyALobbyShouldReturnErrLobbyNotFound() {
+	found, err := s.Repository.FindByID("not existing Lobby ID")
+	s.Nil(found)
+	s.ErrorIs(err, ErrLobbyNotFound)
+}
+
+func (s *LobbyRepositoryTestSuite) TestUpdateLobbyOpponentAndStatusWhenThereIsAlreadyLobbyAndOpponent() {
+	user := s.createTestUser(fixtureUserUsername, fixtureUserPassword)
+	opponent := s.createTestUser("enemy", "12345")
+	lobby := &models.Lobby{
+		LobbyID:   uuid.New().String(),
+		Name:      fixtureLobbyName,
+		CreatorID: user.ID,
+	}
+	s.DB.Create(lobby)
+	err := s.Repository.UpdateLobbyOpponentAndStatus(lobby.LobbyID, opponent.ID, models.LobbyStatusInProgress)
+	s.DB.Model(&models.Lobby{}).First(&lobby)
+	s.NoError(err)
+	s.Equal(opponent.ID, *lobby.OpponentID)
+	s.Equal(models.LobbyStatusInProgress, lobby.Status)
+}
+
+func (s *LobbyRepositoryTestSuite) TestUpdateLobbyOpponentAndStatusWhenOpponentIsMissing() {
+	user := s.createTestUser(fixtureUserUsername, fixtureUserPassword)
+	lobby := &models.Lobby{
+		LobbyID:   uuid.New().String(),
+		Name:      fixtureLobbyName,
+		CreatorID: user.ID,
+	}
+	s.DB.Create(lobby)
+	notExistentOppenentId := uint(10)
+	err := s.Repository.UpdateLobbyOpponentAndStatus(lobby.LobbyID, notExistentOppenentId, models.LobbyStatusInProgress)
+	s.ErrorIs(err, usrrepo.ErrUserNotFound)
+}
+
+func (s *LobbyRepositoryTestSuite) TestUpdateLobbyOpponentAndStatusWhenLobbyIsMissing() {
+	opponent := s.createTestUser("enemy", "12345")
+	err := s.Repository.UpdateLobbyOpponentAndStatus("not existing lobby name", opponent.ID, models.LobbyStatusInProgress)
+	s.ErrorIs(err, ErrLobbyNotFound)
 }
 
 func TestLobbyRepository(t *testing.T) {

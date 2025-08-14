@@ -7,12 +7,13 @@ import (
 )
 
 var (
-	ErrLobbyExists = errors.New("lobby already exists in the database")
+	ErrLobbyExists   = errors.New("lobby already exists in the database")
+	ErrLobbyNotFound = errors.New("lobby not found in the database")
 )
 
 type LobbyRepository interface {
 	Create(lobby *models.Lobby) error
 	FindByID(lobbyID string) (*models.Lobby, error)
-	Join(lobbyID string, opponentID uint) error
+	UpdateLobbyOpponentAndStatus(lobbyID string, opponentID uint, status models.LobbyStatus) error
 	ListAvailable() ([]models.Lobby, error)
 }
