@@ -145,8 +145,55 @@ func (s *LobbyRepositoryTestSuite) TestUpdateLobbyOpponentAndStatusWhenOpponentI
 
 func (s *LobbyRepositoryTestSuite) TestUpdateLobbyOpponentAndStatusWhenLobbyIsMissing() {
 	opponent := s.createTestUser("enemy", "12345")
-	err := s.Repository.UpdateLobbyOpponentAndStatus("not existing lobby name", opponent.ID, models.LobbyStatusInProgress)
+	err := s.Repository.UpdateLobbyOpponentAndStatus("not existing lobby ID", opponent.ID, models.LobbyStatusInProgress)
 	s.ErrorIs(err, ErrLobbyNotFound)
+}
+
+func (s *LobbyRepositoryTestSuite) TestListAvailableWhenThereAreWaitingLobbies() {
+	user := s.createTestUser(fixtureUserUsername, fixtureUserPassword)
+	firstLobby := &models.Lobby{
+		LobbyID:   uuid.New().String(),
+		Name:      fixtureLobbyName,
+		CreatorID: user.ID,
+	}
+	s.DB.Create(firstLobby)
+	secondLobby := &models.Lobby{
+		LobbyID:   uuid.New().String(),
+		Name:      "secondLobby",
+		CreatorID: user.ID,
+	}
+	s.DB.Create(secondLobby)
+
+	lobbies := s.Repository.ListAvailable()
+	s.Len(lobbies, 2)
+	s.Equal(lobbies[0].LobbyID, firstLobby.LobbyID)
+	s.Equal(lobbies[1].LobbyID, secondLobby.LobbyID)
+}
+
+func (s *LobbyRepositoryTestSuite) TestListAvailableWhenDatabseIsEmpty() {
+	lobbies := s.Repository.ListAvailable()
+	s.Empty(lobbies)
+}
+
+func (s *LobbyRepositoryTestSuite) TestListAvailableWhenThereAreNotWaitingLobbies() {
+	user := s.createTestUser(fixtureUserUsername, fixtureUserPassword)
+	firstLobby := &models.Lobby{
+		LobbyID:   uuid.New().String(),
+		Name:      fixtureLobbyName,
+		CreatorID: user.ID,
+		Status:    models.LobbyStatusInProgress,
+	}
+	s.DB.Create(firstLobby)
+	secondLobby := &models.Lobby{
+		LobbyID:   uuid.New().String(),
+		Name:      "secondLobby",
+		CreatorID: user.ID,
+		Status:    models.LobbyStatusInProgress,
+	}
+	s.DB.Create(secondLobby)
+
+	lobbies := s.Repository.ListAvailable()
+	s.Empty(lobbies)
 }
 
 func TestLobbyRepository(t *testing.T) {

@@ -52,7 +52,8 @@ func (r *sqlLobbyRepository) UpdateLobbyOpponentAndStatus(lobbyID string, oppone
 	return nil
 }
 
-// ListAvailable implements LobbyRepository.
-func (s *sqlLobbyRepository) ListAvailable() ([]models.Lobby, error) {
-	panic("unimplemented")
+func (r *sqlLobbyRepository) ListAvailable() []models.Lobby {
+	var lobbies []models.Lobby
+	r.db.Where("status = ?", models.LobbyStatusWaiting).Find(&lobbies)
+	return lobbies
 }
