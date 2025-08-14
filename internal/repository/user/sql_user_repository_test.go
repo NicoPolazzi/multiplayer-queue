@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -15,58 +14,82 @@ const (
 	UserFixturePassword string = "123"
 )
 
-type TestSuite struct {
+type SQLUserRepositoryTestSuite struct {
 	suite.Suite
-	DB         *gorm.DB
-	Repository UserRepository
+	db         *gorm.DB
+	repository UserRepository
 }
 
-func (s *TestSuite) SetupSuite() {
-	db, _ := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	s.DB = db
+func (s *SQLUserRepositoryTestSuite) SetupSuite() {
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		s.T().Fatalf("Failed to connect to database at the suite start: %v", err)
+	}
+	s.db = db
 }
 
-func (s *TestSuite) TearDownSuite() {
-	db, _ := s.DB.DB()
-	db.Close()
+func (s *SQLUserRepositoryTestSuite) TearDownSuite() {
+	db, _ := s.db.DB()
+	if err := db.Close(); err != nil {
+		s.T().Fatalf("Failed to close database connection at the suite end: %v", err)
+	}
 }
 
-func (s *TestSuite) SetupTest() {
-	s.DB.Migrator().DropTable(&models.User{})
-	s.DB.AutoMigrate(&models.User{})
-	s.Repository = NewSQLUserRepository(s.DB)
+func (s *SQLUserRepositoryTestSuite) SetupTest() {
+	if err := s.db.Migrator().DropTable(&models.User{}); err != nil {
+		s.T().Fatalf("Failed to drop User table before test run: %v", err)
+	}
+
+	if err := s.db.AutoMigrate(&models.User{}); err != nil {
+		s.T().Fatalf("Failed to migrate User table before test run: %v", err)
+	}
+	s.repository = NewSQLUserRepository(s.db)
 }
 
-func (s *TestSuite) TestSaveWhenThereIsNotUser() {
+func (s *SQLUserRepositoryTestSuite) TestSaveWhenThereIsNotAlreadyTheUser() {
 	var retrievedUser models.User
-	err := s.Repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
-	s.DB.First(&retrievedUser)
-	assert.Equal(s.T(), UserFixtureUsername, retrievedUser.Username)
-	assert.Equal(s.T(), UserFixturePassword, retrievedUser.Password)
-	assert.Nil(s.T(), err)
+	err := s.repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
+	s.db.First(&retrievedUser)
+	s.Equal(UserFixtureUsername, retrievedUser.Username)
+	s.Equal(UserFixturePassword, retrievedUser.Password)
+	s.NoError(err)
 }
 
-func (s *TestSuite) TestSaveWhenAnExistingUserIsPresentShouldRaiseAnError() {
+func (s *SQLUserRepositoryTestSuite) TestSaveWhenUserIsPresentShouldReturnErrUserExists() {
 	existingUser := models.User{Username: UserFixtureUsername, Password: UserFixturePassword}
-	err := s.DB.Create(&existingUser).Error
-	err = s.Repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
-	assert.ErrorIs(s.T(), err, ErrUserExists)
+	s.db.Create(&existingUser)
+	err := s.repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
+	s.ErrorIs(err, ErrUserExists)
 }
 
-func (s *TestSuite) TestFindByUsernameWhenThereIsAnUserShouldRetrieveTheUser() {
-	s.DB.Create(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
-	retrievedUser, err := s.Repository.FindByUsername(UserFixtureUsername)
-	assert.Equal(s.T(), UserFixtureUsername, retrievedUser.Username)
-	assert.Equal(s.T(), UserFixturePassword, retrievedUser.Password)
-	assert.Nil(s.T(), err)
+func (s *SQLUserRepositoryTestSuite) TestFindByUsernameWhenUserIsPresent() {
+	s.db.Create(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
+	retrievedUser, err := s.repository.FindByUsername(UserFixtureUsername)
+	s.Equal(UserFixtureUsername, retrievedUser.Username)
+	s.Equal(UserFixturePassword, retrievedUser.Password)
+	s.NoError(err)
 }
 
-func (s *TestSuite) TestFindByUsernameWhenThereIsNotAnUserShouldThrowError() {
-	retrievedUser, err := s.Repository.FindByUsername(UserFixtureUsername)
-	assert.Nil(s.T(), retrievedUser)
-	assert.ErrorIs(s.T(), err, ErrUserNotFound)
+func (s *SQLUserRepositoryTestSuite) TestFindByUsernameWhenUserIsMissingShouldReturnErrUserNotFound() {
+	retrievedUser, err := s.repository.FindByUsername(UserFixtureUsername)
+	s.Empty(retrievedUser)
+	s.ErrorIs(err, ErrUserNotFound)
 }
 
-func TestUserSQLRepository(t *testing.T) {
-	suite.Run(t, new(TestSuite))
+func (s *SQLUserRepositoryTestSuite) TestFindByIDWhenUserIsPresent() {
+	s.db.Create(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
+	retrievedUser, err := s.repository.FindByID(1)
+	s.Equal(UserFixtureUsername, retrievedUser.Username)
+	s.Equal(UserFixturePassword, retrievedUser.Password)
+	s.NoError(err)
+}
+
+func (s *SQLUserRepositoryTestSuite) TestFindByIDWhenUserIsMissingShouldReturnErrUserNotFound() {
+	retrievedUser, err := s.repository.FindByID(1)
+	s.Empty(retrievedUser)
+	s.ErrorIs(err, ErrUserNotFound)
+}
+
+func TestSQLUserRepository(t *testing.T) {
+	suite.Run(t, new(SQLUserRepositoryTestSuite))
 }

@@ -52,6 +52,7 @@ func (r *sqlLobbyRepository) UpdateLobbyOpponentAndStatus(lobbyID string, oppone
 	return nil
 }
 
+// The available lobbies are the onces that are waiting for users
 func (r *sqlLobbyRepository) ListAvailable() []models.Lobby {
 	var lobbies []models.Lobby
 	r.db.Where("status = ?", models.LobbyStatusWaiting).Find(&lobbies)

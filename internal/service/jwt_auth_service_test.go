@@ -7,7 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	repository "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
+	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -56,6 +56,11 @@ func (r *UserTestRepository) FindByUsername(username string) (*models.User, erro
 	return nil, args.Error(1)
 }
 
+func (r *UserTestRepository) FindByID(id uint) (*models.User, error) {
+	args := r.Called(id)
+	return args.Get(0).(*models.User), args.Error(1)
+}
+
 func (s *AuthServiceTestSuite) SetupTest() {
 	s.Repository = new(UserTestRepository)
 	s.AuthService = NewJWTAuthService(s.Repository)
@@ -65,7 +70,7 @@ func (s *AuthServiceTestSuite) SetupTest() {
 
 func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {
 	mock.InOrder(
-		s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, repository.ErrUserNotFound),
+		s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, usrrepo.ErrUserNotFound),
 		s.Repository.On("Save", mock.MatchedBy(func(user *models.User) bool {
 			return bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(UserFixturePassword)) == nil
 		})).Return(nil),
@@ -91,7 +96,7 @@ func (s *AuthServiceTestSuite) TestRegisterOnHashErrorShouldFail() {
 		return nil, errors.New("mock hash failure")
 	}
 
-	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, repository.ErrUserNotFound)
+	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, usrrepo.ErrUserNotFound)
 	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
 	assert.Error(s.T(), err)
@@ -112,7 +117,7 @@ func (s *AuthServiceTestSuite) TestLoginSuccess() {
 }
 
 func (s *AuthServiceTestSuite) TestLoginWhenUserIsNotFoundShouldReturnInvalidCredentialsError() {
-	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, repository.ErrUserNotFound)
+	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, usrrepo.ErrUserNotFound)
 	token, err := s.AuthService.Login(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
 	assert.ErrorIs(s.T(), err, ErrInvalidCredentials)
