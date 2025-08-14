@@ -9,16 +9,18 @@ import (
 )
 
 type sqlLobbyRepository struct {
-	db *gorm.DB
+	db             *gorm.DB
+	userRepository usrrepo.UserRepository
 }
 
-func NewSQLLobbyRepository(db *gorm.DB) LobbyRepository {
-	return &sqlLobbyRepository{db: db}
+func NewSQLLobbyRepository(db *gorm.DB, userRepository usrrepo.UserRepository) LobbyRepository {
+	return &sqlLobbyRepository{db: db, userRepository: userRepository}
 }
 
 func (r *sqlLobbyRepository) Create(lobby *models.Lobby) error {
-	if err := r.db.First(&models.User{}, lobby.CreatorID).Error; err != nil {
-		return usrrepo.ErrUserNotFound
+	_, err := r.userRepository.FindByID(lobby.CreatorID)
+	if err != nil {
+		return err
 	}
 
 	if err := r.db.Create(lobby).Error; err != nil {
@@ -38,8 +40,9 @@ func (r *sqlLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
 }
 
 func (r *sqlLobbyRepository) UpdateLobbyOpponentAndStatus(lobbyID string, opponentID uint, status models.LobbyStatus) error {
-	if err := r.db.First(&models.User{}, opponentID).Error; err != nil {
-		return usrrepo.ErrUserNotFound
+	_, err := r.userRepository.FindByID(opponentID)
+	if err != nil {
+		return err
 	}
 
 	result := r.db.Model(&models.Lobby{}).Where("lobby_id = ?", lobbyID).
