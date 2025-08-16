@@ -42,7 +42,7 @@ func (h *UserHandler) ShowIndexPage(c *gin.Context) {
 }
 
 func (h *UserHandler) ShowLRegisterPage(c *gin.Context) {
-	c.HTML(http.StatusOK, registerPageFilename, gin.H{"title": "Login"})
+	c.HTML(http.StatusOK, registerPageFilename, gin.H{"title": "Register"})
 }
 
 func (h *UserHandler) PerformRegistration(c *gin.Context) {
