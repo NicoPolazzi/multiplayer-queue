@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	repository "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
+	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -13,16 +13,12 @@ import (
 var bcryptGenerate = bcrypt.GenerateFromPassword
 
 type JWTAuthService struct {
-	userRepository repository.UserRepository
+	userRepository usrrepo.UserRepository
 	jwtManager     token.TokenManager
 }
 
-func NewJWTAuthService(repository repository.UserRepository) AuthService {
-	return &JWTAuthService{userRepository: repository}
-}
-
-func (s *JWTAuthService) SetTokenManager(m token.TokenManager) {
-	s.jwtManager = m
+func NewJWTAuthService(repository usrrepo.UserRepository, jwtManager token.TokenManager) AuthService {
+	return &JWTAuthService{userRepository: repository, jwtManager: jwtManager}
 }
 
 func (s *JWTAuthService) Register(username, password string) error {
@@ -40,7 +36,7 @@ func (s *JWTAuthService) Register(username, password string) error {
 
 func (s *JWTAuthService) Login(username, password string) (string, error) {
 	user, err := s.userRepository.FindByUsername(username)
-	if errors.Is(err, repository.ErrUserNotFound) {
+	if errors.Is(err, usrrepo.ErrUserNotFound) {
 		return "", ErrInvalidCredentials
 	}
 

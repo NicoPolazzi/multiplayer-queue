@@ -55,7 +55,6 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValid() {
 	handler(s.context)
 
 	s.tokenManager.AssertExpectations(s.T())
-
 	username, _ := s.context.Get("username")
 	isLoggedIn, _ := s.context.Get("is_logged_in")
 	s.True(isLoggedIn.(bool))

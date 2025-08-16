@@ -14,6 +14,8 @@ const (
 	loginPageFilename        string = "login.html"
 	registrationErrorMessage string = "Registration Failed"
 	loginErrorMessage        string = "Login Failed"
+	IndexPagePath            string = "/"
+	LoginPagePath            string = "/user/login"
 )
 
 type AuthRequest struct {
