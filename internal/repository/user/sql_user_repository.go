@@ -17,8 +17,8 @@ func NewSQLUserRepository(db *gorm.DB) UserRepository {
 	}
 }
 
-func (r *sqlUserRepository) Save(user *models.User) error {
-	if result := r.db.Save(user); result.Error != nil {
+func (r *sqlUserRepository) Create(user *models.User) error {
+	if result := r.db.Create(user); result.Error != nil {
 		return ErrUserExists
 	} else {
 		return nil

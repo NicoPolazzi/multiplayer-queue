@@ -12,7 +12,7 @@ var (
 )
 
 type UserRepository interface {
-	Save(user *models.User) error
+	Create(user *models.User) error
 	FindByUsername(username string) (*models.User, error)
 	FindByID(id uint) (*models.User, error)
 }

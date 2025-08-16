@@ -35,7 +35,7 @@ func (s *JWTAuthService) Register(username, password string) error {
 		return err
 	}
 
-	return s.userRepository.Save(&models.User{Username: username, Password: string(hashedPassword)})
+	return s.userRepository.Create(&models.User{Username: username, Password: string(hashedPassword)})
 }
 
 func (s *JWTAuthService) Login(username, password string) (string, error) {

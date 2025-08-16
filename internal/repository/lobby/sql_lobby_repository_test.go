@@ -30,17 +30,12 @@ type UserTestRepository struct {
 	mock.Mock
 }
 
-func (r *UserTestRepository) Save(user *models.User) error {
-	args := r.Called(user)
-	return args.Error(0)
+func (r *UserTestRepository) Create(user *models.User) error {
+	return nil
 }
 
 func (r *UserTestRepository) FindByUsername(username string) (*models.User, error) {
-	args := r.Called(username)
-	if user, ok := args.Get(0).(*models.User); ok {
-		return user, args.Error(1)
-	}
-	return nil, args.Error(1)
+	return nil, nil
 }
 
 func (r *UserTestRepository) FindByID(id uint) (*models.User, error) {

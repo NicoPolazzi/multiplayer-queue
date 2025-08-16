@@ -48,7 +48,7 @@ func (s *SQLUserRepositoryTestSuite) SetupTest() {
 
 func (s *SQLUserRepositoryTestSuite) TestSaveWhenThereIsNotAlreadyTheUser() {
 	var retrievedUser models.User
-	err := s.repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
+	err := s.repository.Create(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
 	s.db.First(&retrievedUser)
 	s.Equal(UserFixtureUsername, retrievedUser.Username)
 	s.Equal(UserFixturePassword, retrievedUser.Password)
@@ -58,7 +58,7 @@ func (s *SQLUserRepositoryTestSuite) TestSaveWhenThereIsNotAlreadyTheUser() {
 func (s *SQLUserRepositoryTestSuite) TestSaveWhenUserIsPresentShouldReturnErrUserExists() {
 	existingUser := models.User{Username: UserFixtureUsername, Password: UserFixturePassword}
 	s.db.Create(&existingUser)
-	err := s.repository.Save(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
+	err := s.repository.Create(&models.User{Username: UserFixtureUsername, Password: UserFixturePassword})
 	s.ErrorIs(err, ErrUserExists)
 }
 

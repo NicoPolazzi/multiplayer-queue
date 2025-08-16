@@ -43,7 +43,7 @@ type UserTestRepository struct {
 	mock.Mock
 }
 
-func (r *UserTestRepository) Save(user *models.User) error {
+func (r *UserTestRepository) Create(user *models.User) error {
 	args := r.Called(user)
 	return args.Error(0)
 }
