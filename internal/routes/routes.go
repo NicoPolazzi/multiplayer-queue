@@ -17,7 +17,7 @@ func NewRoutes(handler *handlers.UserHandler, authMiddleware *middleware.AuthMid
 
 func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	router.Use(m.authMiddleware.CheckUser())
-	router.GET("/", handlers.ShowIndexPage)
+	router.GET("/", m.handler.ShowIndexPage)
 
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.EnsureNotLoggedIn())
