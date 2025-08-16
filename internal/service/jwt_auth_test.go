@@ -20,9 +20,9 @@ const (
 
 type JWTAuthServiceTestSuite struct {
 	suite.Suite
-	Repository *UserTestRepository
-	Manager    *TokenTestManager
-	AuthService
+	Repository  *UserTestRepository
+	Manager     *TokenTestManager
+	authService AuthService
 }
 
 type TokenTestManager struct {
@@ -64,7 +64,7 @@ func (r *UserTestRepository) FindByID(id uint) (*models.User, error) {
 func (s *JWTAuthServiceTestSuite) SetupTest() {
 	s.Repository = new(UserTestRepository)
 	s.Manager = new(TokenTestManager)
-	s.AuthService = NewJWTAuthService(s.Repository, s.Manager)
+	s.authService = NewJWTAuthService(s.Repository, s.Manager)
 }
 
 func (s *JWTAuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {
@@ -75,14 +75,14 @@ func (s *JWTAuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShoul
 		})).Return(nil),
 	)
 
-	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
+	err := s.authService.Register(UserFixtureUsername, UserFixturePassword)
 	assert.Nil(s.T(), err)
 	s.Repository.AssertExpectations(s.T())
 }
 
 func (s *JWTAuthServiceTestSuite) TestRegisterWhenThereIsAlreadyAnUserShouldRaiseUsernameTakenError() {
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(models.User{}, nil)
-	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
+	err := s.authService.Register(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
 	assert.ErrorIs(s.T(), err, ErrUsernameTaken)
 }
@@ -96,7 +96,7 @@ func (s *JWTAuthServiceTestSuite) TestRegisterOnHashErrorShouldFail() {
 	}
 
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, usrrepo.ErrUserNotFound)
-	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
+	err := s.authService.Register(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
 	assert.Error(s.T(), err)
 }
@@ -107,7 +107,7 @@ func (s *JWTAuthServiceTestSuite) TestLoginSuccess() {
 		&models.User{Username: UserFixtureUsername, Password: string(hashedPassword)}, nil)
 	s.Manager.On("Create", UserFixtureUsername).Return("mock-jwt-token-value", nil)
 
-	token, err := s.AuthService.Login(UserFixtureUsername, UserFixturePassword)
+	token, err := s.authService.Login(UserFixtureUsername, UserFixturePassword)
 
 	s.Repository.AssertExpectations(s.T())
 	s.Manager.AssertExpectations(s.T())
@@ -117,7 +117,7 @@ func (s *JWTAuthServiceTestSuite) TestLoginSuccess() {
 
 func (s *JWTAuthServiceTestSuite) TestLoginWhenUserIsNotFoundShouldReturnInvalidCredentialsError() {
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, usrrepo.ErrUserNotFound)
-	token, err := s.AuthService.Login(UserFixtureUsername, UserFixturePassword)
+	token, err := s.authService.Login(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
 	assert.ErrorIs(s.T(), err, ErrInvalidCredentials)
 	assert.Empty(s.T(), token)
@@ -126,7 +126,7 @@ func (s *JWTAuthServiceTestSuite) TestLoginWhenUserIsNotFoundShouldReturnInvalid
 func (s *JWTAuthServiceTestSuite) TestLoginWhenPasswordDoesNotMatchdReturnInvalidCredentialsError() {
 	user := models.User{Username: UserFixtureUsername, Password: UserFixturePassword}
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(&user, nil)
-	token, err := s.AuthService.Login(UserFixtureUsername, "wrong password")
+	token, err := s.authService.Login(UserFixtureUsername, "wrong password")
 	assert.ErrorIs(s.T(), err, ErrInvalidCredentials)
 	assert.Empty(s.T(), token)
 }

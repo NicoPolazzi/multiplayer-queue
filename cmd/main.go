@@ -49,5 +49,10 @@ func main() {
 	router := gin.Default()
 	router.LoadHTMLGlob("web/templates/*")
 	routesManager.InitializeRoutes(router)
-	router.Run()
+
+	err = router.Run()
+	if err != nil {
+		log.Fatal("Failed to start server:", err)
+	}
+	log.Println("Server is running on http://localhost:8080")
 }
