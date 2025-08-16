@@ -34,7 +34,7 @@ func NewUserHandler(authService service.AuthService) *UserHandler {
 func ShowIndexPage(c *gin.Context) {
 	isLoggedIn, _ := c.Get("is_logged_in")
 	username, _ := c.Get("username")
-	c.HTML(http.StatusOK, "index.html", gin.H{
+	c.HTML(http.StatusOK, indexPageFilename, gin.H{
 		"title":        "Home Page",
 		"is_logged_in": isLoggedIn,
 		"username":     username,

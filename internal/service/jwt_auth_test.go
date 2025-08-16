@@ -18,7 +18,7 @@ const (
 	UserFixturePassword string = "123"
 )
 
-type AuthServiceTestSuite struct {
+type JWTAuthServiceTestSuite struct {
 	suite.Suite
 	Repository *UserTestRepository
 	Manager    *TokenTestManager
@@ -61,17 +61,16 @@ func (r *UserTestRepository) FindByID(id uint) (*models.User, error) {
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (s *AuthServiceTestSuite) SetupTest() {
+func (s *JWTAuthServiceTestSuite) SetupTest() {
 	s.Repository = new(UserTestRepository)
-	s.AuthService = NewJWTAuthService(s.Repository)
 	s.Manager = new(TokenTestManager)
-	s.AuthService.(*JWTAuthService).SetTokenManager(s.Manager)
+	s.AuthService = NewJWTAuthService(s.Repository, s.Manager)
 }
 
-func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {
+func (s *JWTAuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSuccess() {
 	mock.InOrder(
 		s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, usrrepo.ErrUserNotFound),
-		s.Repository.On("Save", mock.MatchedBy(func(user *models.User) bool {
+		s.Repository.On("Create", mock.MatchedBy(func(user *models.User) bool {
 			return bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(UserFixturePassword)) == nil
 		})).Return(nil),
 	)
@@ -81,14 +80,14 @@ func (s *AuthServiceTestSuite) TestRegisterWhenThereIsNotARegisteredUserShouldSu
 	s.Repository.AssertExpectations(s.T())
 }
 
-func (s *AuthServiceTestSuite) TestRegisterWhenThereIsAlreadyAnUserShouldRaiseUsernameTakenError() {
-	s.Repository.On("FindByUsername", UserFixtureUsername).Return(mock.AnythingOfType("*models.User"), nil)
+func (s *JWTAuthServiceTestSuite) TestRegisterWhenThereIsAlreadyAnUserShouldRaiseUsernameTakenError() {
+	s.Repository.On("FindByUsername", UserFixtureUsername).Return(models.User{}, nil)
 	err := s.AuthService.Register(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
 	assert.ErrorIs(s.T(), err, ErrUsernameTaken)
 }
 
-func (s *AuthServiceTestSuite) TestRegisterOnHashErrorShouldFail() {
+func (s *JWTAuthServiceTestSuite) TestRegisterOnHashErrorShouldFail() {
 	// This is necessary to let other tests to use the regular function
 	originalBcryptGenerate := bcryptGenerate
 	defer func() { bcryptGenerate = originalBcryptGenerate }()
@@ -102,7 +101,7 @@ func (s *AuthServiceTestSuite) TestRegisterOnHashErrorShouldFail() {
 	assert.Error(s.T(), err)
 }
 
-func (s *AuthServiceTestSuite) TestLoginSuccess() {
+func (s *JWTAuthServiceTestSuite) TestLoginSuccess() {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(UserFixturePassword), bcrypt.DefaultCost)
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(
 		&models.User{Username: UserFixtureUsername, Password: string(hashedPassword)}, nil)
@@ -116,7 +115,7 @@ func (s *AuthServiceTestSuite) TestLoginSuccess() {
 	assert.Equal(s.T(), "mock-jwt-token-value", token)
 }
 
-func (s *AuthServiceTestSuite) TestLoginWhenUserIsNotFoundShouldReturnInvalidCredentialsError() {
+func (s *JWTAuthServiceTestSuite) TestLoginWhenUserIsNotFoundShouldReturnInvalidCredentialsError() {
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(nil, usrrepo.ErrUserNotFound)
 	token, err := s.AuthService.Login(UserFixtureUsername, UserFixturePassword)
 	s.Repository.AssertExpectations(s.T())
@@ -124,7 +123,7 @@ func (s *AuthServiceTestSuite) TestLoginWhenUserIsNotFoundShouldReturnInvalidCre
 	assert.Empty(s.T(), token)
 }
 
-func (s *AuthServiceTestSuite) TestLoginWhenPasswordDoesNotMatchdReturnInvalidCredentialsError() {
+func (s *JWTAuthServiceTestSuite) TestLoginWhenPasswordDoesNotMatchdReturnInvalidCredentialsError() {
 	user := models.User{Username: UserFixtureUsername, Password: UserFixturePassword}
 	s.Repository.On("FindByUsername", UserFixtureUsername).Return(&user, nil)
 	token, err := s.AuthService.Login(UserFixtureUsername, "wrong password")
@@ -133,5 +132,5 @@ func (s *AuthServiceTestSuite) TestLoginWhenPasswordDoesNotMatchdReturnInvalidCr
 }
 
 func TestJWTAuthService(t *testing.T) {
-	suite.Run(t, new(AuthServiceTestSuite))
+	suite.Run(t, new(JWTAuthServiceTestSuite))
 }

@@ -64,10 +64,8 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValid() {
 
 func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenCookiesIsNotSet() {
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-
 	handler := s.authMiddleware.CheckUser()
 	handler(s.context)
-
 	username, _ := s.context.Get("username")
 	isLoggedIn, _ := s.context.Get("is_logged_in")
 	s.Empty(username)
@@ -77,7 +75,6 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenCookiesIsNotSet() {
 func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsInvalid() {
 	invalidToken := "invalid.token.string"
 	s.tokenManager.On("Validate", invalidToken).Return("", token.ErrInvalidToken)
-
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
 	s.context.Request.AddCookie(&http.Cookie{
 		Name:  "jwt",
