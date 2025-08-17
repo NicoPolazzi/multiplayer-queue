@@ -3,22 +3,21 @@ package routes
 import (
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"github.com/gin-gonic/gin"
 )
 
 type RoutesManager struct {
-	handler      *handlers.UserHandler
-	tokenManager *token.TokenManager
+	handler        *handlers.UserHandler
+	authMiddleware *middleware.AuthMiddleware
 }
 
-func NewRoutes(handler *handlers.UserHandler, tokenManager *token.TokenManager) *RoutesManager {
-	return &RoutesManager{handler: handler, tokenManager: tokenManager}
+func NewRoutes(handler *handlers.UserHandler, authMiddleware *middleware.AuthMiddleware) *RoutesManager {
+	return &RoutesManager{handler: handler, authMiddleware: authMiddleware}
 }
 
 func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
-	router.Use(middleware.CheckUser(*m.tokenManager))
-	router.GET("/", handlers.ShowIndexPage)
+	router.Use(m.authMiddleware.CheckUser())
+	router.GET("/", m.handler.ShowIndexPage)
 
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.EnsureNotLoggedIn())
@@ -30,5 +29,4 @@ func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	protected := router.Group("/")
 	protected.Use(middleware.EnsureLoggedIn())
 	protected.GET("/user/logout", m.handler.PerformLogout)
-
 }

@@ -16,8 +16,7 @@ type MockTokenManager struct {
 }
 
 func (m *MockTokenManager) Create(username string) (string, error) {
-	args := m.Called(username)
-	return args.String(0), args.Error(1)
+	return "", nil
 }
 
 func (m *MockTokenManager) Validate(tokenString string) (string, error) {
@@ -27,19 +26,21 @@ func (m *MockTokenManager) Validate(tokenString string) (string, error) {
 
 type AuthMiddlewareTestSuite struct {
 	suite.Suite
-	tokenManager *MockTokenManager
-	recorder     *httptest.ResponseRecorder
-	context      *gin.Context
+	tokenManager   *MockTokenManager
+	authMiddleware *AuthMiddleware
+	recorder       *httptest.ResponseRecorder
+	context        *gin.Context
 }
 
 func (s *AuthMiddlewareTestSuite) SetupTest() {
 	gin.SetMode(gin.TestMode)
 	s.tokenManager = new(MockTokenManager)
+	s.authMiddleware = NewAuthMiddleware(s.tokenManager)
 	s.recorder = httptest.NewRecorder()
 	s.context, _ = gin.CreateTestContext(s.recorder)
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValidSucceeds() {
+func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValid() {
 	validToken := "valid.token.string"
 	expectedUsername := "testuser"
 	s.tokenManager.On("Validate", validToken).Return(expectedUsername, nil)
@@ -50,25 +51,29 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValidSucceeds() {
 		Value: validToken,
 	})
 
-	handler := CheckUser(s.tokenManager)
+	handler := s.authMiddleware.CheckUser()
 	handler(s.context)
 
 	s.tokenManager.AssertExpectations(s.T())
+	username, _ := s.context.Get("username")
+	isLoggedIn, _ := s.context.Get("is_logged_in")
+	s.True(isLoggedIn.(bool))
+	s.Equal(expectedUsername, username)
 	s.False(s.context.IsAborted())
-	s.Equal(expectedUsername, s.context.GetString("username"))
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenCookieIsMissingAbortAndRedirectToLogin() {
+func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenCookiesIsNotSet() {
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-	handler := CheckUser(s.tokenManager)
+	handler := s.authMiddleware.CheckUser()
 	handler(s.context)
-	s.True(s.context.IsAborted())
-	s.Equal(http.StatusSeeOther, s.recorder.Code)
-	s.Equal("/login", s.recorder.Header().Get("Location"))
+	username, _ := s.context.Get("username")
+	isLoggedIn, _ := s.context.Get("is_logged_in")
+	s.Empty(username)
+	s.Empty(isLoggedIn)
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenRequestIsInvalidAbortContext() {
-	invalidToken := "invalidToken"
+func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsInvalid() {
+	invalidToken := "invalid.token.string"
 	s.tokenManager.On("Validate", invalidToken).Return("", token.ErrInvalidToken)
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
 	s.context.Request.AddCookie(&http.Cookie{
@@ -76,14 +81,13 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenRequestIsInvalidAbortCon
 		Value: invalidToken,
 	})
 
-	handler := CheckUser(s.tokenManager)
+	handler := s.authMiddleware.CheckUser()
 	handler(s.context)
-
 	s.tokenManager.AssertExpectations(s.T())
-	s.True(s.context.IsAborted())
-	s.Equal(http.StatusUnauthorized, s.recorder.Code)
-	s.JSONEq(`{"status": "error", "message": "invalid token"}`,
-		s.recorder.Body.String())
+	username, _ := s.context.Get("username")
+	isLoggedIn, _ := s.context.Get("is_logged_in")
+	s.Empty(username)
+	s.False(isLoggedIn.(bool))
 }
 
 func TestAuthMiddleware(t *testing.T) {

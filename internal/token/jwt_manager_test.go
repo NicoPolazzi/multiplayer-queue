@@ -13,11 +13,11 @@ const fixtureSecret string = "test-secret"
 
 type TokenManagerTestSuite struct {
 	suite.Suite
-	TokenManager
+	tokenManager TokenManager
 }
 
 func (s *TokenManagerTestSuite) SetupTest() {
-	s.TokenManager = NewJWTTokenManager([]byte(fixtureSecret))
+	s.tokenManager = NewJWTTokenManager([]byte(fixtureSecret))
 }
 
 func (s *TokenManagerTestSuite) TestCreateWhenThereIsASigningErrorShouldNotCreateTheToken() {
@@ -29,28 +29,26 @@ func (s *TokenManagerTestSuite) TestCreateWhenThereIsASigningErrorShouldNotCreat
 		return "", mockErr
 	}
 
-	tokenString, err := s.TokenManager.Create("testuser")
-
+	tokenString, err := s.tokenManager.Create("testuser")
 	s.ErrorIs(err, ErrImpossibleCreation)
 	s.Empty(tokenString)
 }
 
 func (s *TokenManagerTestSuite) TestCreateSuccess() {
-	tokenString, err := s.TokenManager.Create("testuser")
-
+	tokenString, err := s.tokenManager.Create("testuser")
 	s.NoError(err)
 	s.NotEmpty(tokenString)
 }
 
 func (s *TokenManagerTestSuite) TestValidateWhenTheFormatIsInvalidShouldRaiseInvalidTokenError() {
-	username, err := s.TokenManager.Validate("not-a-valid-token")
+	username, err := s.tokenManager.Validate("not-a-valid-token")
 	s.ErrorIs(err, ErrInvalidToken)
 	s.Empty(username)
 }
 
 func (s *TokenManagerTestSuite) TestValidateWhenTheTokenIsExpiredShouldRaiseInvalidTokenError() {
 	expiredToken := createExpiredToken([]byte(fixtureSecret), "testuser")
-	username, err := s.TokenManager.Validate(expiredToken)
+	username, err := s.tokenManager.Validate(expiredToken)
 	s.ErrorIs(err, ErrInvalidToken)
 	s.Empty(username)
 }
@@ -82,9 +80,7 @@ func (s *TokenManagerTestSuite) TestValidateSuccess() {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, tokenClaims)
 	tokenString, _ := token.SignedString([]byte(fixtureSecret))
-
-	username, err := s.TokenManager.Validate(tokenString)
-
+	username, err := s.tokenManager.Validate(tokenString)
 	s.NoError(err)
 	s.Equal(expectedUsername, username)
 }

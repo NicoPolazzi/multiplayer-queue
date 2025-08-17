@@ -1,4 +1,4 @@
-package repository
+package usrrepo
 
 import (
 	"errors"
@@ -8,17 +8,17 @@ import (
 )
 
 type sqlUserRepository struct {
-	DB *gorm.DB
+	db *gorm.DB
 }
 
 func NewSQLUserRepository(db *gorm.DB) UserRepository {
 	return &sqlUserRepository{
-		DB: db,
+		db: db,
 	}
 }
 
-func (r *sqlUserRepository) Save(user *models.User) error {
-	if result := r.DB.Save(user); result.Error != nil {
+func (r *sqlUserRepository) Create(user *models.User) error {
+	if result := r.db.Create(user); result.Error != nil {
 		return ErrUserExists
 	} else {
 		return nil
@@ -27,7 +27,18 @@ func (r *sqlUserRepository) Save(user *models.User) error {
 
 func (r *sqlUserRepository) FindByUsername(username string) (*models.User, error) {
 	var retrievedUser models.User
-	result := r.DB.Where(&models.User{Username: username}).First(&retrievedUser)
+	result := r.db.Where(&models.User{Username: username}).First(&retrievedUser)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+
+	return &retrievedUser, nil
+}
+
+func (r *sqlUserRepository) FindByID(id uint) (*models.User, error) {
+	var retrievedUser models.User
+	result := r.db.First(&retrievedUser, id)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, ErrUserNotFound

@@ -12,8 +12,10 @@ const (
 	indexPageFilename        string = "index.html"
 	registerPageFilename     string = "register.html"
 	loginPageFilename        string = "login.html"
-	registrationErrorMessage string = "Registration Failed"
-	loginErrorMessage        string = "Login Failed"
+	RegistrationErrorMessage string = "Registration Failed"
+	LoginErrorMessage        string = "Login Failed"
+	IndexPagePath            string = "/"
+	LoginPagePath            string = "/user/login"
 )
 
 type AuthRequest struct {
@@ -29,10 +31,10 @@ func NewUserHandler(authService service.AuthService) *UserHandler {
 	return &UserHandler{authService: authService}
 }
 
-func ShowIndexPage(c *gin.Context) {
+func (h *UserHandler) ShowIndexPage(c *gin.Context) {
 	isLoggedIn, _ := c.Get("is_logged_in")
 	username, _ := c.Get("username")
-	c.HTML(http.StatusOK, "index.html", gin.H{
+	c.HTML(http.StatusOK, indexPageFilename, gin.H{
 		"title":        "Home Page",
 		"is_logged_in": isLoggedIn,
 		"username":     username,
@@ -40,14 +42,14 @@ func ShowIndexPage(c *gin.Context) {
 }
 
 func (h *UserHandler) ShowLRegisterPage(c *gin.Context) {
-	c.HTML(http.StatusOK, registerPageFilename, gin.H{"title": "Login"})
+	c.HTML(http.StatusOK, registerPageFilename, gin.H{"title": "Register"})
 }
 
 func (h *UserHandler) PerformRegistration(c *gin.Context) {
 	var request AuthRequest
 	if err := c.ShouldBind(&request); err != nil {
 		c.HTML(http.StatusBadRequest, registerPageFilename, gin.H{
-			"ErrorTitle":   registrationErrorMessage,
+			"ErrorTitle":   RegistrationErrorMessage,
 			"ErrorMessage": err.Error()})
 		return
 	}
@@ -56,11 +58,11 @@ func (h *UserHandler) PerformRegistration(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, service.ErrUsernameTaken) {
 			c.HTML(http.StatusBadRequest, registerPageFilename, gin.H{
-				"ErrorTitle":   registrationErrorMessage,
+				"ErrorTitle":   RegistrationErrorMessage,
 				"ErrorMessage": err.Error()})
 		} else {
 			c.HTML(http.StatusInternalServerError, registerPageFilename, gin.H{
-				"ErrorTitle":   registrationErrorMessage,
+				"ErrorTitle":   RegistrationErrorMessage,
 				"ErrorMessage": err.Error()})
 		}
 		return
@@ -79,7 +81,7 @@ func (h *UserHandler) PerformLogin(c *gin.Context) {
 	var request AuthRequest
 	if err := c.ShouldBind(&request); err != nil {
 		c.HTML(http.StatusBadRequest, loginPageFilename, gin.H{
-			"ErrorTitle":   loginErrorMessage,
+			"ErrorTitle":   LoginErrorMessage,
 			"ErrorMessage": "Missing credentials"})
 		return
 	}
@@ -88,11 +90,11 @@ func (h *UserHandler) PerformLogin(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
 			c.HTML(http.StatusUnauthorized, loginPageFilename, gin.H{
-				"ErrorTitle":   loginErrorMessage,
+				"ErrorTitle":   LoginErrorMessage,
 				"ErrorMessage": err.Error()})
 		} else {
 			c.HTML(http.StatusInternalServerError, loginPageFilename, gin.H{
-				"ErrorTitle":   loginErrorMessage,
+				"ErrorTitle":   LoginErrorMessage,
 				"ErrorMessage": err.Error()})
 			return
 		}
