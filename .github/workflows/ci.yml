@@ -52,4 +52,3 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-        if: ${{ secrets.CODECOV_TOKEN }}
