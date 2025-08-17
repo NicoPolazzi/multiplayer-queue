@@ -29,5 +29,4 @@ func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	protected := router.Group("/")
 	protected.Use(middleware.EnsureLoggedIn())
 	protected.GET("/user/logout", m.handler.PerformLogout)
-
 }

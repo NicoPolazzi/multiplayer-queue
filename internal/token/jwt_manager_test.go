@@ -30,14 +30,12 @@ func (s *TokenManagerTestSuite) TestCreateWhenThereIsASigningErrorShouldNotCreat
 	}
 
 	tokenString, err := s.tokenManager.Create("testuser")
-
 	s.ErrorIs(err, ErrImpossibleCreation)
 	s.Empty(tokenString)
 }
 
 func (s *TokenManagerTestSuite) TestCreateSuccess() {
 	tokenString, err := s.tokenManager.Create("testuser")
-
 	s.NoError(err)
 	s.NotEmpty(tokenString)
 }
@@ -82,9 +80,7 @@ func (s *TokenManagerTestSuite) TestValidateSuccess() {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, tokenClaims)
 	tokenString, _ := token.SignedString([]byte(fixtureSecret))
-
 	username, err := s.tokenManager.Validate(tokenString)
-
 	s.NoError(err)
 	s.Equal(expectedUsername, username)
 }

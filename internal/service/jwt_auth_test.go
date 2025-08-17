@@ -35,8 +35,7 @@ func (t *TokenTestManager) Create(username string) (string, error) {
 }
 
 func (t *TokenTestManager) Validate(token string) (string, error) {
-	args := t.Called(token)
-	return args.String(0), args.Error(1)
+	return "", nil
 }
 
 type UserTestRepository struct {
@@ -57,8 +56,7 @@ func (r *UserTestRepository) FindByUsername(username string) (*models.User, erro
 }
 
 func (r *UserTestRepository) FindByID(id uint) (*models.User, error) {
-	args := r.Called(id)
-	return args.Get(0).(*models.User), args.Error(1)
+	return nil, nil
 }
 
 func (s *JWTAuthServiceTestSuite) SetupTest() {
