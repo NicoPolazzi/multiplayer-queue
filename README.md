@@ -1,0 +1,1 @@
+[![Go CI on Linux](https://github.com/NicoPolazzi/multiplayer-queue/actions/workflows/ci.yml/badge.svg)](https://github.com/NicoPolazzi/multiplayer-queue/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/NicoPolazzi/multiplayer-queue)](https://goreportcard.com/report/github.com/NicoPolazzi/multiplayer-queue)
