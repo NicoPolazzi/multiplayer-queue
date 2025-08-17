@@ -12,7 +12,7 @@ fmt:
 	go fmt ./...
 
 test:
-	go test -race -covermode atomic -coverprofile=covprofile $(TESTFOLDER)
+	go test -race -covermode atomic -coverprofile=coverage.txt $(TESTFOLDER)
 
 all:
 	make check-quality
