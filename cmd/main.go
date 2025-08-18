@@ -1,18 +1,27 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net"
+	"net/http"
 	"os"
 
+	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
+	grpcServer "github.com/NicoPolazzi/multiplayer-queue/internal/grpc"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	repository "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
+	lobbyrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/lobby"
+	usrRepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/routes"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"github.com/gin-gonic/gin"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -38,12 +47,48 @@ func main() {
 		log.Fatal("migration failed:", err)
 	}
 
-	userRepo := repository.NewSQLUserRepository(db)
+	userRepo := usrRepo.NewSQLUserRepository(db)
+	lobbyRepo := lobbyrepo.NewSQLLobbyRepository(db, userRepo)
 	tokenManager := token.NewJWTTokenManager(key)
 	authService := service.NewJWTAuthService(userRepo, tokenManager)
 	userHandler := handlers.NewUserHandler(authService)
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
 	routesManager := routes.NewRoutes(userHandler, authMiddleware)
+
+	// TODO: review the initialization of the server and gateway
+	// gRPC server setup
+	go func() {
+		lis, err := net.Listen("tcp", ":9090")
+		if err != nil {
+			log.Fatalf("failed to listen for gRPC: %v", err)
+		}
+		s := grpc.NewServer()
+		lobbyServer := grpcServer.NewLobbyServer(lobbyRepo, userRepo)
+		lobby.RegisterLobbyServiceServer(s, lobbyServer)
+		log.Println("gRPC server listening at", lis.Addr())
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
+	// gRPC gateway setup
+	go func() {
+		ctx := context.Background()
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		mux := runtime.NewServeMux()
+		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+		err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, "localhost:9090", opts)
+		if err != nil {
+			log.Fatalf("Failed to register gRPC gateway: %v", err)
+		}
+
+		log.Println("gRPC gateway listening at :8081")
+		if err := http.ListenAndServe(":8081", mux); err != nil {
+			log.Fatalf("Failed to serve gRPC gateway: %v", err)
+		}
+	}()
 
 	// Server is running on localhost port 8080 by default
 	router := gin.Default()
@@ -54,5 +99,5 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
-	log.Println("Server is running on http://localhost:8080")
+	log.Println("Gin Server is running on http://localhost:8080")
 }
