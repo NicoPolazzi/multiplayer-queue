@@ -73,3 +73,12 @@ func (s *LobbyServer) GetLobby(ctx context.Context, req *lobby.GetLobbyRequest) 
 	}
 	return toProtoLobby(foundLobby), nil
 }
+
+func (s *LobbyServer) ListAvailableLobbies(ctx context.Context, req *lobby.ListAvailableLobbiesRequest) (*lobby.ListAvailableLobbiesResponse, error) {
+	lobbies := s.lobbyRepo.ListAvailable()
+	var protoLobbies []*lobby.Lobby
+	for _, lobby := range lobbies {
+		protoLobbies = append(protoLobbies, toProtoLobby(&lobby))
+	}
+	return &lobby.ListAvailableLobbiesResponse{Lobbies: protoLobbies}, nil
+}

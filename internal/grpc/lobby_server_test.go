@@ -166,6 +166,28 @@ func (s *LobbyServerTestSuite) TestGetLobbyWhenLobbyIsNotPresent() {
 	s.lobbyRepo.AssertExpectations(s.T())
 }
 
+func (s *LobbyServerTestSuite) TestListAvailableLobbiesWhenThereAreWaitingLobbies() {
+	mockLobbies := []models.Lobby{
+		{LobbyID: "1", Name: "Lobby 1", CreatorID: 1, Status: models.LobbyStatusWaiting},
+		{LobbyID: "2", Name: "Lobby 2", CreatorID: 2, Status: models.LobbyStatusWaiting},
+	}
+	s.lobbyRepo.On("ListAvailable").Return(mockLobbies)
+	resp, err := s.server.ListAvailableLobbies(context.Background(), &lobby.ListAvailableLobbiesRequest{})
+	s.NoError(err)
+	s.Len(resp.Lobbies, 2)
+	s.Equal(mockLobbies[0].LobbyID, resp.Lobbies[0].LobbyId)
+	s.Equal(mockLobbies[1].LobbyID, resp.Lobbies[1].LobbyId)
+	s.lobbyRepo.AssertExpectations(s.T())
+}
+
+func (s *LobbyServerTestSuite) TestListAvailableLobbiesWhenThereAreNotWaitingLobbies() {
+	s.lobbyRepo.On("ListAvailable").Return([]models.Lobby{})
+	resp, err := s.server.ListAvailableLobbies(context.Background(), &lobby.ListAvailableLobbiesRequest{})
+	s.NoError(err)
+	s.Empty(resp.Lobbies)
+	s.lobbyRepo.AssertExpectations(s.T())
+}
+
 func TestLobbyServer(t *testing.T) {
 	suite.Run(t, new(LobbyServerTestSuite))
 }
