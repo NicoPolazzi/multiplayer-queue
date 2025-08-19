@@ -11,8 +11,25 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func CreateLobby(c *gin.Context) {
+const (
+	CreateLobbyPath = "/lobbies/create"
+)
+
+type LobbyHandler struct {
+	gatewayBaseURL string
+}
+
+func NewLobbyHandler(gatewayBaseURL string) *LobbyHandler {
+	return &LobbyHandler{gatewayBaseURL: gatewayBaseURL}
+}
+
+func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 	lobbyName := c.PostForm("name")
+	if lobbyName == "" {
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{"message": "Lobby name cannot be empty."})
+		return
+	}
+
 	usernameValue, _ := c.Get("username")
 	username := usernameValue.(string)
 
@@ -22,7 +39,7 @@ func CreateLobby(c *gin.Context) {
 	}
 	reqBody, _ := protojson.Marshal(createReq)
 
-	resp, err := http.Post("http://localhost:8081"+"/api/v1/lobbies", "application/json", bytes.NewBuffer(reqBody))
+	resp, err := http.Post(h.gatewayBaseURL+"/api/v1/lobbies", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
 			"message": "Failed to send create request to lobby service."})
