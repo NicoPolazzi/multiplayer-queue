@@ -31,7 +31,7 @@ func (r *sqlLobbyRepository) Create(lobby *models.Lobby) error {
 
 func (r *sqlLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
 	var retrievedLobby models.Lobby
-	result := r.db.Where(&models.Lobby{LobbyID: lobbyID}).First(&retrievedLobby)
+	result := r.db.Preload("Creator").Preload("Opponent").Where("lobby_id = ?", lobbyID).First(&retrievedLobby)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, ErrLobbyNotFound
@@ -58,6 +58,6 @@ func (r *sqlLobbyRepository) UpdateLobbyOpponentAndStatus(lobbyID string, oppone
 // The available lobbies are the onces that are waiting for users
 func (r *sqlLobbyRepository) ListAvailable() []models.Lobby {
 	var lobbies []models.Lobby
-	r.db.Where("status = ?", models.LobbyStatusWaiting).Find(&lobbies)
+	r.db.Preload("Creator").Where("status = ?", models.LobbyStatusWaiting).Find(&lobbies)
 	return lobbies
 }

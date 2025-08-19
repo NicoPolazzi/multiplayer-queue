@@ -1,5 +1,47 @@
 {{ template "header.html" .}}
 
-<h1>Welcome to the Multiplayer Queue App!</h1>
+{{ if .is_logged_in }}
+<!-- Content for LOGGED-IN users -->
+<h2>Welcome back, {{ .username }}!</h2>
+<hr>
+<h3>Available Lobbies</h3>
+
+{{ if .lobbies }}
+<div class="list-group">
+    {{ range .lobbies }}
+    <div class="list-group-item">
+        <h4 class="list-group-item-heading">{{ .Name }}</h4>
+        <p class="list-group-item-text">Created by: {{ .CreatorUsername }}</p>
+        <form action="/lobbies/{{ .LobbyId }}/join" method="POST" style="margin-top: 10px;">
+            <button type="submit" class="btn btn-success">Join</button>
+        </form>
+    </div>
+    {{ end }}
+</div>
+{{ else }}
+<p>No available lobbies at the moment. Why not create one?</p>
+{{ end }}
+
+<hr>
+<h3>Create a New Lobby</h3>
+<form class="form-inline" action="/lobbies/create" method="POST">
+    <div class="form-group">
+        <label for="lobbyName" class="sr-only">Lobby Name</label>
+        <input type="text" class="form-control" id="lobbyName" name="name" placeholder="My Lobby Name" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Create Lobby</button>
+</form>
+
+{{ else }}
+<!-- Content for GUESTS -->
+<div class="jumbotron">
+    <h1>Welcome to the Game Queue!</h1>
+    <p>Please log in or register to join a lobby and start playing.</p>
+    <p>
+        <a class="btn btn-primary btn-lg" href="/user/login" role="button">Login</a>
+        <a class="btn btn-success btn-lg" href="/user/register" role="button">Register</a>
+    </p>
+</div>
+{{ end }}
 
 {{ template "footer.html" .}}

@@ -17,7 +17,7 @@ func NewRoutes(handler *handlers.UserHandler, authMiddleware *middleware.AuthMid
 
 func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	router.Use(m.authMiddleware.CheckUser())
-	router.GET("/", m.handler.ShowIndexPage)
+	router.GET("/", middleware.LoadLobbies(), m.handler.ShowIndexPage)
 
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.EnsureNotLoggedIn())
@@ -29,4 +29,5 @@ func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	protected := router.Group("/")
 	protected.Use(middleware.EnsureLoggedIn())
 	protected.GET("/user/logout", m.handler.PerformLogout)
+	protected.POST("/lobbies/create", handlers.CreateLobby)
 }
