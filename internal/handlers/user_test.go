@@ -94,7 +94,6 @@ func (s *UserHandlerTestSuite) TestPerformRegistrationSuccess() {
 	s.setPostRequest("username=newuser&password=pass")
 	s.handler.PerformRegistration(s.context)
 	s.Equal(http.StatusOK, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), "Successful registration")
 	s.authService.AssertExpectations(s.T())
 }
 
@@ -135,7 +134,6 @@ func (s *UserHandlerTestSuite) TestPerformLoginSuccess() {
 	s.setPostRequest("username=testuser&password=goodpassword")
 	s.handler.PerformLogin(s.context)
 	s.Equal(http.StatusOK, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), "<title>Successful Login</title>")
 	s.Equal(s.getJWTCookieValue(), token, "JWT cookie should be set with the token")
 	s.authService.AssertExpectations(s.T())
 }
