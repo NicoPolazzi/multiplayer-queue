@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	CreateLobbyPath = "/lobbies/create"
+	CreateLobbyPath   = "/lobbies/create"
+	errorHTMLFilename = "error.html"
 )
 
 type LobbyHandler struct {
@@ -26,7 +27,7 @@ func NewLobbyHandler(gatewayBaseURL string) *LobbyHandler {
 func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 	lobbyName := c.PostForm("name")
 	if lobbyName == "" {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{"message": "Lobby name cannot be empty."})
+		c.HTML(http.StatusBadRequest, errorHTMLFilename, gin.H{"message": "Lobby name cannot be empty."})
 		return
 	}
 
@@ -41,7 +42,7 @@ func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 
 	resp, err := http.Post(h.gatewayBaseURL+"/api/v1/lobbies", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{
 			"message": "Failed to send create request to lobby service."})
 		return
 	}
@@ -51,7 +52,7 @@ func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 		c.Redirect(http.StatusSeeOther, "/")
 	} else {
 		body, _ := io.ReadAll(resp.Body)
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{
 			"message": fmt.Sprintf("Failed to create lobby: %s", string(body))})
 	}
 
