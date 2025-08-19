@@ -1,5 +1,12 @@
 {{ template "header.html" .}}
 
+{{ if .ErrorTitle }}
+<div class="alert alert-danger">
+    <strong>{{ .ErrorTitle }}</strong>
+    <p>{{ .ErrorMessage }}</p>
+</div>
+{{ end }}
+
 {{ if .is_logged_in }}
 <!-- Content for LOGGED-IN users -->
 <h2>Welcome back, {{ .username }}!</h2>

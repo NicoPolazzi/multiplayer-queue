@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
@@ -10,7 +9,15 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func LoadLobbies() gin.HandlerFunc {
+type LobbyMiddleware struct {
+	gatewayBaseURL string
+}
+
+func NewLobbyMiddleware(gatewayBaseURL string) *LobbyMiddleware {
+	return &LobbyMiddleware{gatewayBaseURL: gatewayBaseURL}
+}
+
+func (m *LobbyMiddleware) LoadLobbies() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("lobbies", nil)
 
@@ -20,27 +27,23 @@ func LoadLobbies() gin.HandlerFunc {
 			return
 		}
 
-		resp, err := http.Get("http://localhost:8081" + "/api/v1/lobbies")
+		resp, err := http.Get(m.gatewayBaseURL + "/api/v1/lobbies")
 		if err != nil {
-			log.Printf("LobbyMiddleware: Could not connect to lobby service: %v", err)
+			c.Set("ErrorTitle", "Lobby Service Error")
+			c.Set("ErrorMessage", "Could not retrieve the list of available lobbies. Please try again later.")
 			c.Next()
 			return
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusOK {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Printf("LobbyMiddleware: Failed to read response body: %v", err)
-				c.Next()
-				return
-			}
-
+			body, _ := io.ReadAll(resp.Body)
 			var lobbyList lobby.ListAvailableLobbiesResponse
 			if err := protojson.Unmarshal(body, &lobbyList); err == nil {
 				c.Set("lobbies", lobbyList.Lobbies)
 			} else {
-				log.Printf("LobbyMiddleware: Failed to parse lobby list: %v", err)
+				c.Set("ErrorTitle", "Lobby Service Error")
+				c.Set("ErrorMessage", "Received an invalid response while fetching lobbies.")
 			}
 		}
 
