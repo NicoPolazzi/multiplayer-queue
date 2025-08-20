@@ -12,7 +12,7 @@ var (
 )
 
 type LobbyRepository interface {
-	Create(lobby *models.Lobby) error
+	Create(lobby *models.Lobby) (*models.Lobby, error)
 	FindByID(lobbyID string) (*models.Lobby, error)
 	UpdateLobbyOpponentAndStatus(lobbyID string, opponentID uint, status models.LobbyStatus) error
 	ListAvailable() []models.Lobby

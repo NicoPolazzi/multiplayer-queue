@@ -26,7 +26,9 @@ func (s *LobbyHandlerTestSuite) SetupTest() {
 
 	s.mockGateway = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(s.mockStatus)
-		fmt.Fprint(w, s.mockResponse)
+		if _, err := fmt.Fprint(w, s.mockResponse); err != nil {
+			s.FailNowf("Failed to write mock response", "Error: %v", err)
+		}
 	}))
 	s.handler = NewLobbyHandler(s.mockGateway.URL)
 	s.recorder = httptest.NewRecorder()

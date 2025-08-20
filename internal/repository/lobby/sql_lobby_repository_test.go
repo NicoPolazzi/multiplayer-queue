@@ -78,9 +78,12 @@ func (s *LobbySQLRepositoryTestSuite) TestCreateLobbyWhenThereIsNotAlreadyTheLob
 		Name:      fixtureLobbyName,
 		CreatorID: user.ID,
 	}
-	s.usrRepo.On("FindByID", lobby.CreatorID).Return(&models.User{}, nil)
-	err := s.lobbyRepo.Create(lobby)
+	s.usrRepo.On("FindByID", lobby.CreatorID).Return(&user, nil)
+	newLobby, err := s.lobbyRepo.Create(lobby)
 	assert.Nil(s.T(), err)
+	s.Equal(lobby.LobbyID, newLobby.LobbyID)
+	s.Equal(fixtureLobbyName, newLobby.Name)
+	s.Equal(user.ID, newLobby.CreatorID)
 }
 
 func (s *LobbySQLRepositoryTestSuite) createTestUser(username, password string) models.User {
@@ -97,8 +100,9 @@ func (s *LobbySQLRepositoryTestSuite) TestCreateLobbyWhenUserIsNotAlreadyPresent
 	}
 
 	s.usrRepo.On("FindByID", lobby.CreatorID).Return(&models.User{}, usrrepo.ErrUserNotFound)
-	err := s.lobbyRepo.Create(lobby)
+	newLobby, err := s.lobbyRepo.Create(lobby)
 	s.ErrorIs(err, usrrepo.ErrUserNotFound)
+	s.Empty(newLobby)
 }
 
 func (s *LobbySQLRepositoryTestSuite) TestCreateLobbyWhenLobbyIsAlreadySavedShouldReturnLobbyExistsError() {
@@ -110,8 +114,9 @@ func (s *LobbySQLRepositoryTestSuite) TestCreateLobbyWhenLobbyIsAlreadySavedShou
 	}
 	s.db.Create(lobby)
 	s.usrRepo.On("FindByID", lobby.CreatorID).Return(&models.User{}, nil)
-	err := s.lobbyRepo.Create(lobby)
+	newLobby, err := s.lobbyRepo.Create(lobby)
 	s.ErrorIs(err, ErrLobbyExists)
+	s.Empty(newLobby)
 }
 
 func (s *LobbySQLRepositoryTestSuite) TestFindByIDWhenLobbyIsPresent() {

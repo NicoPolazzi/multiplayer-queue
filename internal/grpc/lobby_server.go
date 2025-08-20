@@ -37,11 +37,7 @@ func (s *LobbyServer) CreateLobby(ctx context.Context, req *lobby.CreateLobbyReq
 		Status:    models.LobbyStatusWaiting,
 	}
 
-	if err := s.lobbyRepo.Create(newLobby); err != nil {
-		return nil, err
-	}
-
-	createdLobby, err := s.lobbyRepo.FindByID(newLobby.LobbyID)
+	createdLobby, err := s.lobbyRepo.Create(newLobby)
 	if err != nil {
 		return nil, err
 	}

@@ -12,6 +12,18 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+	fixtureLobbyName = "Test Lobby"
+	lobbyTypeName    = "*models.Lobby"
+)
+
+type LobbyServerTestSuite struct {
+	suite.Suite
+	lobbyRepo *MockLobbyRepository
+	usrRepo   *MockUserRepository
+	server    *LobbyServer
+}
+
 type MockUserRepository struct {
 	mock.Mock
 }
@@ -41,9 +53,12 @@ type MockLobbyRepository struct {
 	mock.Mock
 }
 
-func (m *MockLobbyRepository) Create(lobby *models.Lobby) error {
+func (m *MockLobbyRepository) Create(lobby *models.Lobby) (*models.Lobby, error) {
 	args := m.Called(lobby)
-	return args.Error(0)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Lobby), args.Error(1)
 }
 
 func (m *MockLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
@@ -64,13 +79,6 @@ func (m *MockLobbyRepository) UpdateLobbyOpponentAndStatus(lobbyID string, oppon
 	return args.Error(0)
 }
 
-type LobbyServerTestSuite struct {
-	suite.Suite
-	lobbyRepo *MockLobbyRepository
-	usrRepo   *MockUserRepository
-	server    *LobbyServer
-}
-
 func (s *LobbyServerTestSuite) SetupTest() {
 	s.lobbyRepo = new(MockLobbyRepository)
 	s.usrRepo = new(MockUserRepository)
@@ -81,7 +89,7 @@ func (s *LobbyServerTestSuite) TestCreateLobbySuccess() {
 	mockUser := &models.User{Username: "testuser", Password: "testpass"}
 	mockLobby := &models.Lobby{
 		LobbyID:   "1234",
-		Name:      "Test Lobby",
+		Name:      fixtureLobbyName,
 		CreatorID: mockUser.ID,
 		Status:    models.LobbyStatusWaiting,
 		Creator:   *mockUser,
@@ -89,12 +97,11 @@ func (s *LobbyServerTestSuite) TestCreateLobbySuccess() {
 
 	mock.InOrder(
 		s.usrRepo.On("FindByUsername", "testuser").Return(mockUser, nil),
-		s.lobbyRepo.On("Create", mock.AnythingOfType("*models.Lobby")).Return(nil),
-		s.lobbyRepo.On("FindByID", mock.AnythingOfType("string")).Return(mockLobby, nil),
+		s.lobbyRepo.On("Create", mock.AnythingOfType(lobbyTypeName)).Return(mockLobby, nil),
 	)
 
 	req := &lobby.CreateLobbyRequest{
-		Name:     "Test Lobby",
+		Name:     fixtureLobbyName,
 		Username: "testuser",
 	}
 
@@ -112,39 +119,45 @@ func (s *LobbyServerTestSuite) TestCreateLobbySuccess() {
 func (s *LobbyServerTestSuite) TestCreateLobbyWhenCreatorIsNotFound() {
 	s.usrRepo.On("FindByUsername", "unknown").Return(nil, usrrepo.ErrUserNotFound)
 	req := &lobby.CreateLobbyRequest{
-		Name:     "Test Lobby",
+		Name:     fixtureLobbyName,
 		Username: "unknown",
 	}
 	_, err := s.server.CreateLobby(context.Background(), req)
 	s.ErrorIs(err, usrrepo.ErrUserNotFound)
 	s.usrRepo.AssertExpectations(s.T())
-	s.lobbyRepo.AssertNotCalled(s.T(), "Create", mock.AnythingOfType("*models.Lobby"))
-	s.lobbyRepo.AssertNotCalled(s.T(), "FindByID", mock.AnythingOfType("string"))
+	s.lobbyRepo.AssertNotCalled(s.T(), "Create", mock.AnythingOfType(lobbyTypeName))
 }
 
 func (s *LobbyServerTestSuite) TestCreateLobbyWhenLobbyAlreadyExists() {
 	mockUser := &models.User{Username: "testuser", Password: "testpass"}
-	s.usrRepo.On("FindByUsername", "testuser").Return(mockUser, nil)
-	s.lobbyRepo.On("Create", mock.AnythingOfType("*models.Lobby")).Return(lobbyrepo.ErrLobbyExists)
+
+	mock.InOrder(
+		s.usrRepo.On("FindByUsername", "testuser").Return(mockUser, nil),
+		s.lobbyRepo.On("Create", mock.AnythingOfType(lobbyTypeName)).Return(nil, lobbyrepo.ErrLobbyExists),
+	)
 
 	req := &lobby.CreateLobbyRequest{
-		Name:     "Test Lobby",
+		Name:     fixtureLobbyName,
 		Username: "testuser",
 	}
 
-	_, err := s.server.CreateLobby(context.Background(), req)
+	resp, err := s.server.CreateLobby(context.Background(), req)
 	s.ErrorIs(err, lobbyrepo.ErrLobbyExists)
+	s.Empty(resp)
 	s.usrRepo.AssertExpectations(s.T())
-	s.lobbyRepo.AssertCalled(s.T(), "Create", mock.AnythingOfType("*models.Lobby"))
-	s.lobbyRepo.AssertNotCalled(s.T(), "FindByID", mock.AnythingOfType("string"))
+	s.lobbyRepo.AssertExpectations(s.T())
 }
 
 func (s *LobbyServerTestSuite) TestGetLobbySuccess() {
+	opponentID := uint(2)
 	mockLobby := &models.Lobby{
-		LobbyID:   "1234",
-		Name:      "Test Lobby",
-		CreatorID: 1,
-		Status:    models.LobbyStatusWaiting,
+		LobbyID:    "1234",
+		Name:       fixtureLobbyName,
+		CreatorID:  1,
+		Creator:    models.User{Username: "creator"},
+		OpponentID: &opponentID,
+		Opponent:   &models.User{Username: "opponent"},
+		Status:     models.LobbyStatusInProgress,
 	}
 
 	s.lobbyRepo.On("FindByID", "1234").Return(mockLobby, nil)
@@ -154,7 +167,12 @@ func (s *LobbyServerTestSuite) TestGetLobbySuccess() {
 	s.Equal(mockLobby.LobbyID, resp.LobbyId)
 	s.Equal(mockLobby.Name, resp.Name)
 	s.Equal(uint32(mockLobby.CreatorID), resp.CreatorId)
+	s.Equal(mockLobby.Creator.Username, resp.CreatorUsername)
 	s.Equal(string(mockLobby.Status), resp.Status)
+	s.Require().NotNil(resp.OpponentId)
+	s.Equal(uint32(*mockLobby.OpponentID), *resp.OpponentId)
+	s.Require().NotNil(resp.OpponentUsername)
+	s.Equal(mockLobby.Opponent.Username, *resp.OpponentUsername)
 	s.lobbyRepo.AssertExpectations(s.T())
 }
 

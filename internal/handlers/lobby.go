@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
@@ -46,7 +47,12 @@ func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 			"message": "Failed to send create request to lobby service."})
 		return
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusOK {
 		c.Redirect(http.StatusSeeOther, "/")

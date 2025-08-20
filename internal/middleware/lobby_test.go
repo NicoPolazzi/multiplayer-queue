@@ -28,7 +28,9 @@ func (s *LobbyMiddlewareTestSuite) SetupTest() {
 	s.mockGateway = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(s.mockStatus)
-		fmt.Fprint(w, s.mockResponse)
+		if _, err := fmt.Fprint(w, s.mockResponse); err != nil {
+			s.FailNowf("Failed to write mock response", "Error: %v", err)
+		}
 	}))
 
 	s.middleware = NewLobbyMiddleware(s.mockGateway.URL)

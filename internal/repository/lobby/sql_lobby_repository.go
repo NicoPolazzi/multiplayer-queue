@@ -17,16 +17,19 @@ func NewSQLLobbyRepository(db *gorm.DB, userRepository usrrepo.UserRepository) L
 	return &sqlLobbyRepository{db: db, userRepository: userRepository}
 }
 
-func (r *sqlLobbyRepository) Create(lobby *models.Lobby) error {
+func (r *sqlLobbyRepository) Create(lobby *models.Lobby) (*models.Lobby, error) {
 	_, err := r.userRepository.FindByID(lobby.CreatorID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := r.db.Create(lobby).Error; err != nil {
-		return ErrLobbyExists
+		return nil, ErrLobbyExists
 	}
-	return nil
+
+	var newLobby models.Lobby
+	result := r.db.First(&newLobby)
+	return &newLobby, result.Error
 }
 
 func (r *sqlLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
