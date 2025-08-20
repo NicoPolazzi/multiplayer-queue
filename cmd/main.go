@@ -31,6 +31,12 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
+
+	host := os.Getenv("HOST")
+	if host == "" {
+		host = "localhost"
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET not set in .env file")
@@ -52,15 +58,15 @@ func main() {
 	tokenManager := token.NewJWTTokenManager(key)
 	authService := service.NewJWTAuthService(userRepo, tokenManager)
 	userHandler := handlers.NewUserHandler(authService)
-	lobbyHandler := handlers.NewLobbyHandler("http://localhost:8081")
-	lobbyMiddleware := middleware.NewLobbyMiddleware("http://localhost:8081")
+	lobbyHandler := handlers.NewLobbyHandler("http://" + host + ":8081")
+	lobbyMiddleware := middleware.NewLobbyMiddleware("http://" + host + ":8081")
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
 	routesManager := routes.NewRoutes(userHandler, lobbyHandler, authMiddleware, lobbyMiddleware)
 
 	// TODO: review the initialization of the server and gateway
 	// gRPC server setup
 	go func() {
-		lis, err := net.Listen("tcp", ":9090")
+		lis, err := net.Listen("tcp", host+":9090")
 		if err != nil {
 			log.Fatalf("failed to listen for gRPC: %v", err)
 		}
@@ -81,7 +87,8 @@ func main() {
 
 		mux := runtime.NewServeMux()
 		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-		err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, "localhost:9090", opts)
+		grpcServerEndpoint := host + ":9090"
+		err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, grpcServerEndpoint, opts)
 		if err != nil {
 			log.Fatalf("Failed to register gRPC gateway: %v", err)
 		}
@@ -92,14 +99,13 @@ func main() {
 		}
 	}()
 
-	// Server is running on localhost port 8080 by default
 	router := gin.Default()
 	router.LoadHTMLGlob("web/templates/*")
 	routesManager.InitializeRoutes(router)
-
-	err = router.Run()
+	log.Printf("Gin Server is running on http://%s:8080", host)
+	err = router.Run(":8080")
 	if err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
-	log.Println("Gin Server is running on http://localhost:8080")
+
 }
