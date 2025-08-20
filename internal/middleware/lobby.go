@@ -14,6 +14,10 @@ type LobbyMiddleware struct {
 	gatewayBaseURL string
 }
 
+const (
+	lobbyErrorTitle = "Lobby Service Error"
+)
+
 func NewLobbyMiddleware(gatewayBaseURL string) *LobbyMiddleware {
 	return &LobbyMiddleware{gatewayBaseURL: gatewayBaseURL}
 }
@@ -76,6 +80,6 @@ func userIsLoggedIn(c *gin.Context) bool {
 }
 
 func setErrorValues(c *gin.Context, message string) {
-	c.Set("ErrorTitle", "Lobby Service Error")
+	c.Set("ErrorTitle", lobbyErrorTitle)
 	c.Set("ErrorMessage", message)
 }

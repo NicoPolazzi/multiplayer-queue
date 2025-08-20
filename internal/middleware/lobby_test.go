@@ -80,8 +80,21 @@ func (s *LobbyMiddlewareTestSuite) TestLoadLobbiesWhenGatewayIsDown() {
 	errorTitle, _ := s.context.Get("ErrorTitle")
 	errorMessage, _ := s.context.Get("ErrorMessage")
 	s.Nil(lobbiesValue)
-	s.Equal("Lobby Service Error", errorTitle)
+	s.Equal(lobbyErrorTitle, errorTitle)
 	s.Equal("Could not retrieve the list of available lobbies. Please try again later.", errorMessage)
+}
+
+func (s *LobbyMiddlewareTestSuite) TestLoadLobbiesWhenGatewayReturnsError() {
+	s.mockStatus = http.StatusInternalServerError
+	s.context.Set("is_logged_in", true)
+	handler := s.middleware.LoadLobbies()
+	handler(s.context)
+	errorTitle, _ := s.context.Get("ErrorTitle")
+	errorMessage, _ := s.context.Get("ErrorMessage")
+	lobbiesValue, _ := s.context.Get("lobbies")
+	s.Nil(lobbiesValue)
+	s.Equal(lobbyErrorTitle, errorTitle)
+	s.Equal("There was a problem retrieving the list of lobbies.", errorMessage)
 }
 
 func (s *LobbyMiddlewareTestSuite) TestLoadLobbiesWhenResponseIsMalformed() {
@@ -94,7 +107,7 @@ func (s *LobbyMiddlewareTestSuite) TestLoadLobbiesWhenResponseIsMalformed() {
 	errorTitle, _ := s.context.Get("ErrorTitle")
 	errorMessage, _ := s.context.Get("ErrorMessage")
 	s.Nil(lobbiesValue)
-	s.Equal("Lobby Service Error", errorTitle)
+	s.Equal(lobbyErrorTitle, errorTitle)
 	s.Equal("Received an invalid response while fetching lobbies.", errorMessage)
 }
 
