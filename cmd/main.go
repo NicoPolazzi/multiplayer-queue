@@ -52,8 +52,10 @@ func main() {
 	tokenManager := token.NewJWTTokenManager(key)
 	authService := service.NewJWTAuthService(userRepo, tokenManager)
 	userHandler := handlers.NewUserHandler(authService)
+	lobbyHandler := handlers.NewLobbyHandler("http://localhost:8081")
+	lobbyMiddleware := middleware.NewLobbyMiddleware("http://localhost:8081")
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
-	routesManager := routes.NewRoutes(userHandler, authMiddleware)
+	routesManager := routes.NewRoutes(userHandler, lobbyHandler, authMiddleware, lobbyMiddleware)
 
 	// TODO: review the initialization of the server and gateway
 	// gRPC server setup

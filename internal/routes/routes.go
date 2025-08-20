@@ -7,27 +7,33 @@ import (
 )
 
 type RoutesManager struct {
-	handler        *handlers.UserHandler
-	authMiddleware *middleware.AuthMiddleware
+	userHandler     *handlers.UserHandler
+	lobbyHandler    *handlers.LobbyHandler
+	authMiddleware  *middleware.AuthMiddleware
+	lobbyMiddleware *middleware.LobbyMiddleware
 }
 
-func NewRoutes(handler *handlers.UserHandler, authMiddleware *middleware.AuthMiddleware) *RoutesManager {
-	return &RoutesManager{handler: handler, authMiddleware: authMiddleware}
+func NewRoutes(userHandler *handlers.UserHandler,
+	lobbyHandler *handlers.LobbyHandler,
+	authMiddleware *middleware.AuthMiddleware,
+	lobbyMiddleware *middleware.LobbyMiddleware) *RoutesManager {
+	return &RoutesManager{userHandler: userHandler, lobbyHandler: lobbyHandler, authMiddleware: authMiddleware,
+		lobbyMiddleware: lobbyMiddleware}
 }
 
 func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	router.Use(m.authMiddleware.CheckUser())
-	router.GET("/", middleware.LoadLobbies(), m.handler.ShowIndexPage)
+	router.GET("/", m.lobbyMiddleware.LoadLobbies(), m.userHandler.ShowIndexPage)
 
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.EnsureNotLoggedIn())
-	userRoutes.GET("/register", m.handler.ShowLRegisterPage)
-	userRoutes.POST("/register", m.handler.PerformRegistration)
-	userRoutes.GET("/login", m.handler.ShowLoginPage)
-	userRoutes.POST("/login", m.handler.PerformLogin)
+	userRoutes.GET("/register", m.userHandler.ShowLRegisterPage)
+	userRoutes.POST("/register", m.userHandler.PerformRegistration)
+	userRoutes.GET("/login", m.userHandler.ShowLoginPage)
+	userRoutes.POST("/login", m.userHandler.PerformLogin)
 
 	protected := router.Group("/")
 	protected.Use(middleware.EnsureLoggedIn())
-	protected.GET("/user/logout", m.handler.PerformLogout)
-	protected.POST("/lobbies/create", handlers.CreateLobby)
+	protected.GET("/user/logout", m.userHandler.PerformLogout)
+	protected.POST("/lobbies/create", m.lobbyHandler.CreateLobby)
 }
