@@ -54,7 +54,7 @@ func main() {
 	}
 
 	userRepo := usrRepo.NewSQLUserRepository(db)
-	lobbyRepo := lobbyrepo.NewSQLLobbyRepository(db, userRepo)
+	lobbyRepo := lobbyrepo.NewSQLLobbyRepository(db)
 	tokenManager := token.NewJWTTokenManager(key)
 	authService := service.NewJWTAuthService(userRepo, tokenManager)
 	userHandler := handlers.NewUserHandler(authService)

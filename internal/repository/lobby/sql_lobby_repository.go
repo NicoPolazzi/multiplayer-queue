@@ -5,90 +5,62 @@ import (
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+const lobbyIdColumn = "lobby_id"
 
 type sqlLobbyRepository struct {
 	db             *gorm.DB
 	userRepository usrrepo.UserRepository
 }
 
-func NewSQLLobbyRepository(db *gorm.DB, userRepository usrrepo.UserRepository) LobbyRepository {
-	return &sqlLobbyRepository{db: db, userRepository: userRepository}
+func NewSQLLobbyRepository(db *gorm.DB) LobbyRepository {
+	return &sqlLobbyRepository{db: db}
 }
 
-func (r *sqlLobbyRepository) Create(name string, creator *models.User) (*models.Lobby, error) {
-	lobby := &models.Lobby{
-		LobbyID: uuid.New().String(),
-		Name:    name,
-	}
-
-	if err := r.db.Create(lobby).Error; err != nil {
-		return nil, ErrLobbyExists
-	}
-
-	if err := r.db.Model(creator).Update("lobby_id", &lobby.LobbyID).Error; err != nil {
-		r.db.Delete(lobby)
-		return nil, err
-	}
-
-	lobby.Players = append(lobby.Players, *creator)
-	return lobby, nil
+func (r *sqlLobbyRepository) Create(lobby *models.Lobby) error {
+	return r.db.Create(lobby).Error
 }
 
 func (r *sqlLobbyRepository) FindByID(lobbyID string) (*models.Lobby, error) {
 	var lobby models.Lobby
-	result := r.db.Preload("Players").Preload("Winner").Where("lobby_id = ?", lobbyID).First(&lobby)
-
+	result := r.db.Preload("Players").Preload("Winner").First(&lobby, "lobby_id = ?", lobbyID)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, ErrLobbyNotFound
 	}
-	return &lobby, nil
+	return &lobby, result.Error
 }
 
-func (r *sqlLobbyRepository) UpdateLobbyOpponentAndStatus(lobbyID string, opponentID uint, status models.LobbyStatus) error {
-	_, err := r.userRepository.FindByID(opponentID)
-	if err != nil {
-		return err
-	}
-
-	result := r.db.Model(&models.Lobby{}).Where("lobby_id = ?", lobbyID).
-		Updates(map[string]any{"opponent_id": &opponentID, "status": status})
-
-	if result.RowsAffected == 0 {
-		return ErrLobbyNotFound
-	}
-
-	return nil
-}
-
-// The available lobbies are the onces that are waiting for users
 func (r *sqlLobbyRepository) ListAvailable() []*models.Lobby {
 	var lobbies []*models.Lobby
 	r.db.Preload("Players").
 		Where("status = ?", models.LobbyStatusWaiting).
 		Find(&lobbies)
-
 	return lobbies
 }
 
-func (r *sqlLobbyRepository) AddPlayerAndSetStatus(lobbyID string, player *models.User, status models.LobbyStatus) error {
-	if err := r.db.Model(player).Update("lobby_id", &lobbyID).Error; err != nil {
-		return err
-	}
-
-	if err := r.db.Model(&models.Lobby{}).Where("lobby_id = ?", lobbyID).Update("status", status).Error; err != nil {
-		r.db.Model(player).Update("lobby_id", nil)
-		return err
-	}
-
-	return nil
+func (r *sqlLobbyRepository) AddPlayer(lobby *models.Lobby, player *models.User) error {
+	return r.db.Model(lobby).Association("Players").Append(player)
 }
 
-func (r *sqlLobbyRepository) UpdateLobbyWinnerAndStatus(lobbyID string, winnerID uint, status models.LobbyStatus) error {
-	return r.db.Model(&models.Lobby{}).Where("lobby_id = ?", lobbyID).Updates(map[string]interface{}{
-		"winner_id": winnerID,
-		"status":    status,
-	}).Error
+func (r *sqlLobbyRepository) UpdateStatus(lobby *models.Lobby, status models.LobbyStatus) error {
+	return r.db.Model(lobby).Update("status", status).Error
+}
+
+func (r *sqlLobbyRepository) UpdateWinner(lobby *models.Lobby, winnerID uint) error {
+	return r.db.Model(lobby).Update("winner_id", winnerID).Error
+}
+
+func (r *sqlLobbyRepository) Delete(lobbyID string) error {
+	var lobby models.Lobby
+	if err := r.db.First(&lobby, "lobby_id = ?", lobbyID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrLobbyNotFound
+		}
+	}
+
+	r.db.Model(&lobby).Association("Players").Clear()
+	r.db.Delete(&lobby)
+	return nil
 }
