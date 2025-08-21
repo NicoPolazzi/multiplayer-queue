@@ -22,13 +22,11 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LobbyServiceClient interface {
-	// Creates a new lobby. The creator is inferred from the authentication context.
 	CreateLobby(ctx context.Context, in *CreateLobbyRequest, opts ...grpc.CallOption) (*Lobby, error)
 	GetLobby(ctx context.Context, in *GetLobbyRequest, opts ...grpc.CallOption) (*Lobby, error)
-	ListAvailableLobbies(ctx context.Context, in *ListAvailableLobbiesRequest, opts ...grpc.CallOption) (*ListAvailableLobbiesResponse, error)
-	// Allows a user to join an existing lobby. The user joining is inferred
-	// from the authentication context.
 	JoinLobby(ctx context.Context, in *JoinLobbyRequest, opts ...grpc.CallOption) (*Lobby, error)
+	FinishGame(ctx context.Context, in *FinishGameRequest, opts ...grpc.CallOption) (*Lobby, error)
+	ListAvailableLobbies(ctx context.Context, in *ListAvailableLobbiesRequest, opts ...grpc.CallOption) (*ListAvailableLobbiesResponse, error)
 }
 
 type lobbyServiceClient struct {
@@ -57,18 +55,27 @@ func (c *lobbyServiceClient) GetLobby(ctx context.Context, in *GetLobbyRequest, 
 	return out, nil
 }
 
-func (c *lobbyServiceClient) ListAvailableLobbies(ctx context.Context, in *ListAvailableLobbiesRequest, opts ...grpc.CallOption) (*ListAvailableLobbiesResponse, error) {
-	out := new(ListAvailableLobbiesResponse)
-	err := c.cc.Invoke(ctx, "/lobby.LobbyService/ListAvailableLobbies", in, out, opts...)
+func (c *lobbyServiceClient) JoinLobby(ctx context.Context, in *JoinLobbyRequest, opts ...grpc.CallOption) (*Lobby, error) {
+	out := new(Lobby)
+	err := c.cc.Invoke(ctx, "/lobby.LobbyService/JoinLobby", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *lobbyServiceClient) JoinLobby(ctx context.Context, in *JoinLobbyRequest, opts ...grpc.CallOption) (*Lobby, error) {
+func (c *lobbyServiceClient) FinishGame(ctx context.Context, in *FinishGameRequest, opts ...grpc.CallOption) (*Lobby, error) {
 	out := new(Lobby)
-	err := c.cc.Invoke(ctx, "/lobby.LobbyService/JoinLobby", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/lobby.LobbyService/FinishGame", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lobbyServiceClient) ListAvailableLobbies(ctx context.Context, in *ListAvailableLobbiesRequest, opts ...grpc.CallOption) (*ListAvailableLobbiesResponse, error) {
+	out := new(ListAvailableLobbiesResponse)
+	err := c.cc.Invoke(ctx, "/lobby.LobbyService/ListAvailableLobbies", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,13 +86,11 @@ func (c *lobbyServiceClient) JoinLobby(ctx context.Context, in *JoinLobbyRequest
 // All implementations must embed UnimplementedLobbyServiceServer
 // for forward compatibility
 type LobbyServiceServer interface {
-	// Creates a new lobby. The creator is inferred from the authentication context.
 	CreateLobby(context.Context, *CreateLobbyRequest) (*Lobby, error)
 	GetLobby(context.Context, *GetLobbyRequest) (*Lobby, error)
-	ListAvailableLobbies(context.Context, *ListAvailableLobbiesRequest) (*ListAvailableLobbiesResponse, error)
-	// Allows a user to join an existing lobby. The user joining is inferred
-	// from the authentication context.
 	JoinLobby(context.Context, *JoinLobbyRequest) (*Lobby, error)
+	FinishGame(context.Context, *FinishGameRequest) (*Lobby, error)
+	ListAvailableLobbies(context.Context, *ListAvailableLobbiesRequest) (*ListAvailableLobbiesResponse, error)
 	mustEmbedUnimplementedLobbyServiceServer()
 }
 
@@ -99,11 +104,14 @@ func (UnimplementedLobbyServiceServer) CreateLobby(context.Context, *CreateLobby
 func (UnimplementedLobbyServiceServer) GetLobby(context.Context, *GetLobbyRequest) (*Lobby, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLobby not implemented")
 }
-func (UnimplementedLobbyServiceServer) ListAvailableLobbies(context.Context, *ListAvailableLobbiesRequest) (*ListAvailableLobbiesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListAvailableLobbies not implemented")
-}
 func (UnimplementedLobbyServiceServer) JoinLobby(context.Context, *JoinLobbyRequest) (*Lobby, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method JoinLobby not implemented")
+}
+func (UnimplementedLobbyServiceServer) FinishGame(context.Context, *FinishGameRequest) (*Lobby, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinishGame not implemented")
+}
+func (UnimplementedLobbyServiceServer) ListAvailableLobbies(context.Context, *ListAvailableLobbiesRequest) (*ListAvailableLobbiesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAvailableLobbies not implemented")
 }
 func (UnimplementedLobbyServiceServer) mustEmbedUnimplementedLobbyServiceServer() {}
 
@@ -154,24 +162,6 @@ func _LobbyService_GetLobby_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _LobbyService_ListAvailableLobbies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListAvailableLobbiesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(LobbyServiceServer).ListAvailableLobbies(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/lobby.LobbyService/ListAvailableLobbies",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(LobbyServiceServer).ListAvailableLobbies(ctx, req.(*ListAvailableLobbiesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _LobbyService_JoinLobby_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(JoinLobbyRequest)
 	if err := dec(in); err != nil {
@@ -186,6 +176,42 @@ func _LobbyService_JoinLobby_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(LobbyServiceServer).JoinLobby(ctx, req.(*JoinLobbyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LobbyService_FinishGame_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinishGameRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LobbyServiceServer).FinishGame(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lobby.LobbyService/FinishGame",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LobbyServiceServer).FinishGame(ctx, req.(*FinishGameRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LobbyService_ListAvailableLobbies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAvailableLobbiesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LobbyServiceServer).ListAvailableLobbies(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lobby.LobbyService/ListAvailableLobbies",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LobbyServiceServer).ListAvailableLobbies(ctx, req.(*ListAvailableLobbiesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -206,12 +232,16 @@ var LobbyService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _LobbyService_GetLobby_Handler,
 		},
 		{
-			MethodName: "ListAvailableLobbies",
-			Handler:    _LobbyService_ListAvailableLobbies_Handler,
-		},
-		{
 			MethodName: "JoinLobby",
 			Handler:    _LobbyService_JoinLobby_Handler,
+		},
+		{
+			MethodName: "FinishGame",
+			Handler:    _LobbyService_FinishGame_Handler,
+		},
+		{
+			MethodName: "ListAvailableLobbies",
+			Handler:    _LobbyService_ListAvailableLobbies_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

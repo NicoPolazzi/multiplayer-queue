@@ -48,7 +48,7 @@ func (m *LobbyMiddleware) LoadLobbies() gin.HandlerFunc {
 }
 
 func (m *LobbyMiddleware) requestLobbiesToGateway(c *gin.Context) *http.Response {
-	resp, err := http.Get(m.gatewayBaseURL + "/api/v1/lobbies")
+	resp, err := http.Get(m.gatewayBaseURL + "/api/v1/lobbies/available")
 	if err != nil {
 		setErrorValues(c, "Could not retrieve the list of available lobbies. Please try again later.")
 		log.Printf("LobbyMiddleware: Could not connect to lobby service: %v", err)

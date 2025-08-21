@@ -36,4 +36,7 @@ func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	protected.Use(middleware.EnsureLoggedIn())
 	protected.GET("/user/logout", m.userHandler.PerformLogout)
 	protected.POST("/lobbies/create", m.lobbyHandler.CreateLobby)
+	protected.POST("/lobbies/:lobby_id/join", m.lobbyHandler.JoinLobby)
+	protected.GET("/lobbies/:lobby_id", m.lobbyHandler.GetLobbyPage)
+	protected.PUT("/api/v1/lobbies/:lobby_id/finish", m.lobbyHandler.FinishLobby)
 }

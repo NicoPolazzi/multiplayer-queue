@@ -14,17 +14,34 @@
 <h3>Available Lobbies</h3>
 
 {{ if .lobbies }}
-<div class="list-group">
-    {{ range .lobbies }}
-    <div class="list-group-item">
-        <h4 class="list-group-item-heading">{{ .Name }}</h4>
-        <p class="list-group-item-text">Created by: {{ .CreatorUsername }}</p>
-        <form action="/lobbies/{{ .LobbyId }}/join" method="POST" style="margin-top: 10px;">
-            <button type="submit" class="btn btn-success">Join</button>
-        </form>
-    </div>
-    {{ end }}
-</div>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Lobby Name</th>
+            <th>Creator</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{ range .lobbies }}
+        <tr>
+            <td>{{ .Name }}</td>
+            <td>
+                {{ if .Players }}
+                {{ (index .Players 0).Username }}
+                {{ else }}
+                N/A
+                {{ end }}
+            </td>
+            <td>
+                <form action="/lobbies/{{.LobbyId}}/join" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-success btn-sm">Join</button>
+                </form>
+            </td>
+        </tr>
+        {{ end }}
+    </tbody>
+</table>
 {{ else }}
 <p>No available lobbies at the moment. Why not create one?</p>
 {{ end }}

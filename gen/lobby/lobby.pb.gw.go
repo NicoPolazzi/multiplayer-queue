@@ -101,27 +101,6 @@ func local_request_LobbyService_GetLobby_0(ctx context.Context, marshaler runtim
 	return msg, metadata, err
 }
 
-func request_LobbyService_ListAvailableLobbies_0(ctx context.Context, marshaler runtime.Marshaler, client LobbyServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ListAvailableLobbiesRequest
-		metadata runtime.ServerMetadata
-	)
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
-	msg, err := client.ListAvailableLobbies(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-}
-
-func local_request_LobbyService_ListAvailableLobbies_0(ctx context.Context, marshaler runtime.Marshaler, server LobbyServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ListAvailableLobbiesRequest
-		metadata runtime.ServerMetadata
-	)
-	msg, err := server.ListAvailableLobbies(ctx, &protoReq)
-	return msg, metadata, err
-}
-
 func request_LobbyService_JoinLobby_0(ctx context.Context, marshaler runtime.Marshaler, client LobbyServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq JoinLobbyRequest
@@ -164,6 +143,72 @@ func local_request_LobbyService_JoinLobby_0(ctx context.Context, marshaler runti
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lobby_id", err)
 	}
 	msg, err := server.JoinLobby(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_LobbyService_FinishGame_0(ctx context.Context, marshaler runtime.Marshaler, client LobbyServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq FinishGameRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["lobby_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lobby_id")
+	}
+	protoReq.LobbyId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lobby_id", err)
+	}
+	msg, err := client.FinishGame(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_LobbyService_FinishGame_0(ctx context.Context, marshaler runtime.Marshaler, server LobbyServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq FinishGameRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["lobby_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lobby_id")
+	}
+	protoReq.LobbyId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lobby_id", err)
+	}
+	msg, err := server.FinishGame(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_LobbyService_ListAvailableLobbies_0(ctx context.Context, marshaler runtime.Marshaler, client LobbyServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListAvailableLobbiesRequest
+		metadata runtime.ServerMetadata
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	msg, err := client.ListAvailableLobbies(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_LobbyService_ListAvailableLobbies_0(ctx context.Context, marshaler runtime.Marshaler, server LobbyServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListAvailableLobbiesRequest
+		metadata runtime.ServerMetadata
+	)
+	msg, err := server.ListAvailableLobbies(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -213,26 +258,6 @@ func RegisterLobbyServiceHandlerServer(ctx context.Context, mux *runtime.ServeMu
 		}
 		forward_LobbyService_GetLobby_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_LobbyService_ListAvailableLobbies_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		var stream runtime.ServerTransportStream
-		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/lobby.LobbyService/ListAvailableLobbies", runtime.WithHTTPPathPattern("/api/v1/lobbies"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := local_request_LobbyService_ListAvailableLobbies_0(annotatedContext, inboundMarshaler, server, req, pathParams)
-		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_LobbyService_ListAvailableLobbies_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPut, pattern_LobbyService_JoinLobby_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -252,6 +277,46 @@ func RegisterLobbyServiceHandlerServer(ctx context.Context, mux *runtime.ServeMu
 			return
 		}
 		forward_LobbyService_JoinLobby_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPut, pattern_LobbyService_FinishGame_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/lobby.LobbyService/FinishGame", runtime.WithHTTPPathPattern("/api/v1/lobbies/{lobby_id}/finish"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_LobbyService_FinishGame_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_LobbyService_FinishGame_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_LobbyService_ListAvailableLobbies_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/lobby.LobbyService/ListAvailableLobbies", runtime.WithHTTPPathPattern("/api/v1/lobbies/available"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_LobbyService_ListAvailableLobbies_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_LobbyService_ListAvailableLobbies_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -327,23 +392,6 @@ func RegisterLobbyServiceHandlerClient(ctx context.Context, mux *runtime.ServeMu
 		}
 		forward_LobbyService_GetLobby_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_LobbyService_ListAvailableLobbies_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/lobby.LobbyService/ListAvailableLobbies", runtime.WithHTTPPathPattern("/api/v1/lobbies"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := request_LobbyService_ListAvailableLobbies_0(annotatedContext, inboundMarshaler, client, req, pathParams)
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_LobbyService_ListAvailableLobbies_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPut, pattern_LobbyService_JoinLobby_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -361,19 +409,55 @@ func RegisterLobbyServiceHandlerClient(ctx context.Context, mux *runtime.ServeMu
 		}
 		forward_LobbyService_JoinLobby_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPut, pattern_LobbyService_FinishGame_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/lobby.LobbyService/FinishGame", runtime.WithHTTPPathPattern("/api/v1/lobbies/{lobby_id}/finish"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_LobbyService_FinishGame_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_LobbyService_FinishGame_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_LobbyService_ListAvailableLobbies_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/lobby.LobbyService/ListAvailableLobbies", runtime.WithHTTPPathPattern("/api/v1/lobbies/available"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_LobbyService_ListAvailableLobbies_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_LobbyService_ListAvailableLobbies_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
 	pattern_LobbyService_CreateLobby_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "lobbies"}, ""))
 	pattern_LobbyService_GetLobby_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "lobbies", "lobby_id"}, ""))
-	pattern_LobbyService_ListAvailableLobbies_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "lobbies"}, ""))
 	pattern_LobbyService_JoinLobby_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "lobbies", "lobby_id", "join"}, ""))
+	pattern_LobbyService_FinishGame_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "lobbies", "lobby_id", "finish"}, ""))
+	pattern_LobbyService_ListAvailableLobbies_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "lobbies", "available"}, ""))
 )
 
 var (
 	forward_LobbyService_CreateLobby_0          = runtime.ForwardResponseMessage
 	forward_LobbyService_GetLobby_0             = runtime.ForwardResponseMessage
-	forward_LobbyService_ListAvailableLobbies_0 = runtime.ForwardResponseMessage
 	forward_LobbyService_JoinLobby_0            = runtime.ForwardResponseMessage
+	forward_LobbyService_FinishGame_0           = runtime.ForwardResponseMessage
+	forward_LobbyService_ListAvailableLobbies_0 = runtime.ForwardResponseMessage
 )
