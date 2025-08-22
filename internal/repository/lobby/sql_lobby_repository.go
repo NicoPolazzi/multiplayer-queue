@@ -4,15 +4,11 @@ import (
 	"errors"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"gorm.io/gorm"
 )
 
-const lobbyIdColumn = "lobby_id"
-
 type sqlLobbyRepository struct {
-	db             *gorm.DB
-	userRepository usrrepo.UserRepository
+	db *gorm.DB
 }
 
 func NewSQLLobbyRepository(db *gorm.DB) LobbyRepository {
@@ -60,7 +56,10 @@ func (r *sqlLobbyRepository) Delete(lobbyID string) error {
 		}
 	}
 
-	r.db.Model(&lobby).Association("Players").Clear()
+	if err := r.db.Model(&lobby).Association("Players").Clear(); err != nil {
+		return err
+	}
+
 	r.db.Delete(&lobby)
 	return nil
 }

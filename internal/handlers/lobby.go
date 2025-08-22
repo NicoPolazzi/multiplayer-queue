@@ -99,7 +99,12 @@ func (h *LobbyHandler) JoinLobby(c *gin.Context) {
 		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to send join request to lobby service."})
 		return
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusOK {
 		c.Redirect(http.StatusSeeOther, "/lobbies/"+lobbyID)
@@ -118,7 +123,12 @@ func (h *LobbyHandler) GetLobbyPage(c *gin.Context) {
 		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to get lobby details."})
 		return
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -165,7 +175,12 @@ func (h *LobbyHandler) FinishLobby(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to contact gateway"})
 		return
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
