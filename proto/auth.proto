@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package auth;
+
+import "google/api/annotations.proto";
+
+option go_package = "gen/auth";
+
+service AuthService {
+    rpc RegisterUser(RegisterUserRequest) returns (User) {
+        option (google.api.http) = {
+            post: "/api/v1/auth/register",
+            body: "*"
+        };
+    }
+
+    rpc LoginUser(LoginUserRequest) returns (LoginUserResponse) {
+        option (google.api.http) = {
+            post: "/api/v1/auth/login",
+            body: "*"
+        };
+    }
+}
+
+message User {
+    uint32 id = 1;
+    string username = 2;
+}
+
+message RegisterUserRequest {
+    string username = 1;
+    string password = 2;
+}
+
+message LoginUserRequest {
+    string username = 1;
+    string password = 2;
+}
+
+// Response message for a successful login.
+message LoginUserResponse {
+    string token = 1;
+    // The user object for the authenticated user.
+    User user = 2;
+}
