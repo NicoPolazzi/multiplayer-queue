@@ -9,8 +9,8 @@ import (
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
-	authServer "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/auth"
-	lobbyServer "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/lobby"
+	grpcauth "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/auth"
+	grpclobby "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/lobby"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
@@ -73,9 +73,9 @@ func main() {
 			log.Fatalf("failed to listen for gRPC: %v", err)
 		}
 		s := grpc.NewServer()
-		lobbyServer := lobbyServer.NewLobbyServer(lobbyRepo, userRepo)
+		lobbyServer := grpclobby.NewLobbyService(lobbyRepo, userRepo)
 		lobby.RegisterLobbyServiceServer(s, lobbyServer)
-		authServer := authServer.NewAuthServer(userRepo, tokenManager)
+		authServer := grpcauth.NewAuthService(userRepo, tokenManager)
 		auth.RegisterAuthServiceServer(s, authServer)
 		log.Println("gRPC server listening at", lis.Addr())
 		if err := s.Serve(lis); err != nil {

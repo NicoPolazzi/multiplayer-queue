@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	pb "github.com/NicoPolazzi/multiplayer-queue/gen/auth"
+	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
@@ -13,20 +13,20 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type server struct {
-	pb.UnimplementedAuthServiceServer
+type AuthService struct {
+	auth.UnimplementedAuthServiceServer
 	userRepository usrrepo.UserRepository
 	jwtManager     token.TokenManager
 }
 
-func NewAuthServer(repo usrrepo.UserRepository, manager token.TokenManager) pb.AuthServiceServer {
-	return &server{
+func NewAuthService(repo usrrepo.UserRepository, manager token.TokenManager) auth.AuthServiceServer {
+	return &AuthService{
 		userRepository: repo,
 		jwtManager:     manager,
 	}
 }
 
-func (s *server) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.User, error) {
+func (s *AuthService) RegisterUser(ctx context.Context, req *auth.RegisterUserRequest) (*auth.User, error) {
 	if _, err := s.userRepository.FindByUsername(req.GetUsername()); err == nil {
 		return nil, status.Errorf(codes.AlreadyExists, "username is already taken")
 	}
@@ -45,14 +45,14 @@ func (s *server) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) 
 		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
 	}
 
-	return &pb.User{
+	return &auth.User{
 		Id:       uint32(userModel.ID),
 		Username: userModel.Username,
 	}, nil
 }
 
 // It checks for the credentials and returns the computed JWT to the caller
-func (s *server) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (*pb.LoginUserResponse, error) {
+func (s *AuthService) LoginUser(ctx context.Context, req *auth.LoginUserRequest) (*auth.LoginUserResponse, error) {
 	user, err := s.userRepository.FindByUsername(req.GetUsername())
 	if err != nil {
 		if errors.Is(err, usrrepo.ErrUserNotFound) {
@@ -71,9 +71,9 @@ func (s *server) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (*pb.L
 		return nil, status.Errorf(codes.Internal, "failed to create token: %v", err)
 	}
 
-	return &pb.LoginUserResponse{
+	return &auth.LoginUserResponse{
 		Token: token,
-		User: &pb.User{
+		User: &auth.User{
 			Id:       uint32(user.ID),
 			Username: user.Username,
 		},

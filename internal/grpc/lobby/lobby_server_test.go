@@ -1,4 +1,4 @@
-package grpc
+package grpclobby
 
 import (
 	"context"
@@ -22,7 +22,7 @@ type LobbyServerTestSuite struct {
 	suite.Suite
 	lobbyRepo *MockLobbyRepository
 	usrRepo   *MockUserRepository
-	server    *LobbyServer
+	server    *LobbyService
 }
 
 type MockUserRepository struct {
@@ -82,7 +82,7 @@ func (m *MockLobbyRepository) ListAvailable() []*models.Lobby {
 func (s *LobbyServerTestSuite) SetupTest() {
 	s.lobbyRepo = new(MockLobbyRepository)
 	s.usrRepo = new(MockUserRepository)
-	s.server = NewLobbyServer(s.lobbyRepo, s.usrRepo)
+	s.server = NewLobbyService(s.lobbyRepo, s.usrRepo)
 }
 
 func (s *LobbyServerTestSuite) TestCreateLobbySuccess() {

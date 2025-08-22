@@ -56,7 +56,7 @@ type AuthServerTestSuite struct {
 func (s *AuthServerTestSuite) SetupTest() {
 	s.usrRepo = new(MockUserRepository)
 	s.jwtManager = new(MockTokenManager)
-	s.server = NewAuthServer(s.usrRepo, s.jwtManager)
+	s.server = NewAuthService(s.usrRepo, s.jwtManager)
 }
 
 func (s *AuthServerTestSuite) TestRegisterUserSuccess() {
