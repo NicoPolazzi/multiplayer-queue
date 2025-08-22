@@ -58,6 +58,7 @@ func (s *server) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (*pb.L
 		if errors.Is(err, usrrepo.ErrUserNotFound) {
 			return nil, status.Errorf(codes.NotFound, "invalid credentials")
 		}
+		return nil, status.Errorf(codes.Internal, "failed to retrieve user: %v", err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.GetPassword()))

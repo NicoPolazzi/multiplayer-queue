@@ -1,160 +1,124 @@
 package handlers
 
 import (
-	"errors"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
-	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
+	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
-type MockAuthService struct {
-	mock.Mock
-}
-
-func (m *MockAuthService) Register(username, password string) error {
-	args := m.Called(username, password)
-	return args.Error(0)
-}
-
-func (m *MockAuthService) Login(username, password string) (string, error) {
-	args := m.Called(username, password)
-	return args.String(0), args.Error(1)
-}
-
 type UserHandlerTestSuite struct {
 	suite.Suite
-	authService *MockAuthService
+	router      *gin.Engine
+	mockGateway *httptest.Server
 	handler     *UserHandler
-	recorder    *httptest.ResponseRecorder
-	context     *gin.Context
-	engine      *gin.Engine
 }
 
 func (s *UserHandlerTestSuite) SetupTest() {
 	gin.SetMode(gin.TestMode)
-	s.authService = new(MockAuthService)
-	s.handler = NewUserHandler(s.authService)
-	s.recorder = httptest.NewRecorder()
-	s.context, s.engine = gin.CreateTestContext(s.recorder)
-	s.engine.LoadHTMLGlob("../../web/templates/*")
+	s.router = gin.Default()
+	s.router.LoadHTMLGlob("../../web/templates/*")
 }
 
-func (s *UserHandlerTestSuite) TestShowIndexPage() {
-	s.context.Set("is_logged_in", true)
-	s.context.Set("username", "testuser")
-	s.handler.ShowIndexPage(s.context)
-	s.Equal(http.StatusOK, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), "Home Page")
-	s.Contains(s.recorder.Body.String(), "testuser")
+func (s *UserHandlerTestSuite) AfterTest() {
+	if s.mockGateway != nil {
+		s.mockGateway.Close()
+	}
 }
 
-func (s *UserHandlerTestSuite) TestShowRegisterPage() {
-	s.handler.ShowLRegisterPage(s.context)
-	s.Equal(http.StatusOK, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), "<title>Register</title>")
-}
-
-func (s *UserHandlerTestSuite) TestPerformRegistrationWhenRequestIsMalformed() {
-	s.setPostRequest("")
-	s.handler.PerformRegistration(s.context)
-	s.Equal(http.StatusBadRequest, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), RegistrationErrorMessage)
-}
-func (s *UserHandlerTestSuite) setPostRequest(form string) {
-	s.context.Request = httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(form))
-	s.context.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-}
-
-func (s *UserHandlerTestSuite) TestPerformRegistrationWhenUsernameTaken() {
-	s.authService.On("Register", "takenuser", "pass").Return(service.ErrUsernameTaken)
-	s.setPostRequest("username=takenuser&password=pass")
-	s.handler.PerformRegistration(s.context)
-	s.Equal(http.StatusBadRequest, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), RegistrationErrorMessage)
-	s.authService.AssertExpectations(s.T())
-}
-
-func (s *UserHandlerTestSuite) TestPerformRegistrationWhenInternalError() {
-	s.authService.On("Register", "takenuser", "pass").Return(errors.New("some internal error"))
-	s.setPostRequest("username=takenuser&password=pass")
-	s.handler.PerformRegistration(s.context)
-	s.Equal(http.StatusInternalServerError, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), RegistrationErrorMessage)
-	s.authService.AssertExpectations(s.T())
-}
-
-func (s *UserHandlerTestSuite) TestPerformRegistrationSuccess() {
-	s.authService.On("Register", "newuser", "pass").Return(nil)
-	s.setPostRequest("username=newuser&password=pass")
-	s.handler.PerformRegistration(s.context)
-	s.Equal(http.StatusOK, s.recorder.Code)
-	s.authService.AssertExpectations(s.T())
-}
-
-func (s *UserHandlerTestSuite) TestShowLoginPage() {
-	s.handler.ShowLoginPage(s.context)
-	s.Equal(http.StatusOK, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), "<title>Login</title>")
-}
-
-func (s *UserHandlerTestSuite) TestPerformLoginWhenRequestIsMalformed() {
-	s.setPostRequest("")
-	s.handler.PerformLogin(s.context)
-	s.Equal(http.StatusBadRequest, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), LoginErrorMessage)
-}
-
-func (s *UserHandlerTestSuite) TestPerformLoginWhenInvalidCredentials() {
-	s.authService.On("Login", "testuser", "invalid").Return("", service.ErrInvalidCredentials)
-	s.setPostRequest("username=testuser&password=invalid")
-	s.handler.PerformLogin(s.context)
-	s.Equal(http.StatusUnauthorized, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), LoginErrorMessage)
-	s.authService.AssertExpectations(s.T())
-}
-
-func (s *UserHandlerTestSuite) TestPerformLoginWhenInternalError() {
-	s.authService.On("Login", "testuser", "invalid").Return("", errors.New("some internal error"))
-	s.setPostRequest("username=testuser&password=invalid")
-	s.handler.PerformLogin(s.context)
-	s.Equal(http.StatusInternalServerError, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), LoginErrorMessage)
-	s.authService.AssertExpectations(s.T())
+func (s *UserHandlerTestSuite) setupMockGateway(handler http.HandlerFunc) {
+	s.mockGateway = httptest.NewServer(handler)
+	s.handler = NewUserHandler(s.mockGateway.URL)
 }
 
 func (s *UserHandlerTestSuite) TestPerformLoginSuccess() {
-	token := "sometoken"
-	s.authService.On("Login", "testuser", "goodpassword").Return(token, nil)
-	s.setPostRequest("username=testuser&password=goodpassword")
-	s.handler.PerformLogin(s.context)
-	s.Equal(http.StatusOK, s.recorder.Code)
-	s.Equal(s.getJWTCookieValue(), token, "JWT cookie should be set with the token")
-	s.authService.AssertExpectations(s.T())
+	s.setupMockGateway(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		mockResponse := &auth.LoginUserResponse{
+			Token: "mock-jwt-token",
+			User:  &auth.User{Id: 1, Username: "testuser"},
+		}
+		json.NewEncoder(w).Encode(mockResponse)
+	})
+	s.router.POST("/user/login", s.handler.PerformLogin)
+
+	formData := url.Values{}
+	formData.Set("username", "testuser")
+	formData.Set("password", "password123")
+	req, _ := http.NewRequest(http.MethodPost, "/user/login", strings.NewReader(formData.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusSeeOther, w.Code)
+	s.Equal("/", w.Header().Get("Location"))
+	s.Contains(w.Header().Get("Set-Cookie"), "token=mock-jwt-token")
 }
 
-func (s *UserHandlerTestSuite) getJWTCookieValue() string {
-	for _, cookie := range s.recorder.Result().Cookies() {
-		if cookie.Name == "jwt" {
-			return cookie.Value
-		}
-	}
-	return ""
+func (s *UserHandlerTestSuite) TestPerformLoginFailureRendersLoginPageWithError() {
+	s.setupMockGateway(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	s.router.POST("/user/login", s.handler.PerformLogin)
+
+	formData := url.Values{}
+	formData.Set("username", "testuser")
+	formData.Set("password", "wrongpassword")
+	req, _ := http.NewRequest(http.MethodPost, "/user/login", strings.NewReader(formData.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusUnauthorized, w.Code)
+
+	htmlBody := w.Body.String()
+
+	expectedErrorMessage := "Login Failed: Invalid username or password."
+	s.Contains(htmlBody, expectedErrorMessage, "HTML body should contain the error message")
+	s.Contains(htmlBody, "<form class=\"form\" action=\"/user/login\" method=\"POST\">", "HTML body should contain the login form")
+	s.Contains(htmlBody, "<input type=\"text\" class=\"form-control\" id=\"username\" name=\"username\"", "HTML body should contain the username field")
+}
+
+func (s *UserHandlerTestSuite) TestPerformRegistrationSuccess() {
+	s.setupMockGateway(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	s.router.POST("/user/register", s.handler.PerformRegistration)
+	formData := url.Values{}
+	formData.Set("username", "newuser")
+	formData.Set("password", "password123")
+	req, _ := http.NewRequest(http.MethodPost, "/user/register", strings.NewReader(formData.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusSeeOther, w.Code)
+	s.Equal("/user/login", w.Header().Get("Location"))
 }
 
 func (s *UserHandlerTestSuite) TestPerformLogout() {
-	s.context.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	s.handler.PerformLogout(s.context)
-	s.Equal(s.getJWTCookieValue(), "", "JWT cookie should be cleared on logout")
-	s.Equal(http.StatusSeeOther, s.recorder.Code)
-	s.Equal(IndexPagePath, s.recorder.Header().Get("Location"))
+	s.setupMockGateway(nil)
+	s.router.GET("/user/logout", s.handler.PerformLogout)
+
+	req, _ := http.NewRequest(http.MethodGet, "/user/logout", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusSeeOther, w.Code)
+	s.Equal("/", w.Header().Get("Location"))
+	s.Contains(w.Header().Get("Set-Cookie"), "Max-Age=0")
 }
 
-func TestUserHandlerTestSuite(t *testing.T) {
+func TestUserHandler(t *testing.T) {
 	suite.Run(t, new(UserHandlerTestSuite))
 }

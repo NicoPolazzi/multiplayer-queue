@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
-	grpcServer "github.com/NicoPolazzi/multiplayer-queue/internal/grpc"
+	authServer "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/auth"
+	lobbyServer "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/lobby"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
 	lobbyrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/lobby"
 	usrRepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/routes"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/service"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"github.com/gin-gonic/gin"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -53,13 +54,14 @@ func main() {
 		log.Fatal("migration failed:", err)
 	}
 
+	gatewayEndpoint := "http://" + host + ":8081"
+
 	userRepo := usrRepo.NewSQLUserRepository(db)
 	lobbyRepo := lobbyrepo.NewSQLLobbyRepository(db)
 	tokenManager := token.NewJWTTokenManager(key)
-	authService := service.NewJWTAuthService(userRepo, tokenManager)
-	userHandler := handlers.NewUserHandler(authService)
-	lobbyHandler := handlers.NewLobbyHandler("http://" + host + ":8081")
-	lobbyMiddleware := middleware.NewLobbyMiddleware("http://" + host + ":8081")
+	userHandler := handlers.NewUserHandler(gatewayEndpoint)
+	lobbyHandler := handlers.NewLobbyHandler(gatewayEndpoint)
+	lobbyMiddleware := middleware.NewLobbyMiddleware(gatewayEndpoint)
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
 	routesManager := routes.NewRoutes(userHandler, lobbyHandler, authMiddleware, lobbyMiddleware)
 
@@ -71,8 +73,10 @@ func main() {
 			log.Fatalf("failed to listen for gRPC: %v", err)
 		}
 		s := grpc.NewServer()
-		lobbyServer := grpcServer.NewLobbyServer(lobbyRepo, userRepo)
+		lobbyServer := lobbyServer.NewLobbyServer(lobbyRepo, userRepo)
 		lobby.RegisterLobbyServiceServer(s, lobbyServer)
+		authServer := authServer.NewAuthServer(userRepo, tokenManager)
+		auth.RegisterAuthServiceServer(s, authServer)
 		log.Println("gRPC server listening at", lis.Addr())
 		if err := s.Serve(lis); err != nil {
 			log.Fatalf("failed to serve gRPC: %v", err)
@@ -91,6 +95,10 @@ func main() {
 		err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, grpcServerEndpoint, opts)
 		if err != nil {
 			log.Fatalf("Failed to register gRPC gateway: %v", err)
+		}
+		err = auth.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, grpcServerEndpoint, opts)
+		if err != nil {
+			log.Fatalf("Failed to register Auth gRPC gateway: %v", err)
 		}
 
 		log.Println("gRPC gateway listening at :8081")

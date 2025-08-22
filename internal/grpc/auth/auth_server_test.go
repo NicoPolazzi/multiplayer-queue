@@ -62,6 +62,7 @@ func (s *AuthServerTestSuite) SetupTest() {
 func (s *AuthServerTestSuite) TestRegisterUserSuccess() {
 	req := &pb.RegisterUserRequest{Username: "newuser", Password: "password123"}
 	s.usrRepo.On("FindByUsername", "newuser").Return(nil, usrrepo.ErrUserNotFound)
+	// The call to Run() is necessary because it simulates the behaviour of GORM Create()
 	s.usrRepo.On("Create", mock.AnythingOfType("*models.User")).
 		Run(func(args mock.Arguments) {
 			userArg := args.Get(0).(*models.User)

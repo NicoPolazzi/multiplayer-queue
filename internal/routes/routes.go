@@ -23,20 +23,29 @@ func NewRoutes(userHandler *handlers.UserHandler,
 
 func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 	router.Use(m.authMiddleware.CheckUser())
-	router.GET("/", m.lobbyMiddleware.LoadLobbies(), m.userHandler.ShowIndexPage)
 
+	// Routes for guest users
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.EnsureNotLoggedIn())
-	userRoutes.GET("/register", m.userHandler.ShowLRegisterPage)
-	userRoutes.POST("/register", m.userHandler.PerformRegistration)
-	userRoutes.GET("/login", m.userHandler.ShowLoginPage)
-	userRoutes.POST("/login", m.userHandler.PerformLogin)
+	{
+		userRoutes.GET("/register", m.userHandler.ShowRegisterPage)
+		userRoutes.POST("/register", m.userHandler.PerformRegistration)
+		userRoutes.GET("/login", m.userHandler.ShowLoginPage)
+		userRoutes.POST("/login", m.userHandler.PerformLogin)
+	}
 
+	// Routes for logged users
 	protected := router.Group("/")
 	protected.Use(middleware.EnsureLoggedIn())
-	protected.GET("/user/logout", m.userHandler.PerformLogout)
-	protected.POST("/lobbies/create", m.lobbyHandler.CreateLobby)
-	protected.POST("/lobbies/:lobby_id/join", m.lobbyHandler.JoinLobby)
-	protected.GET("/lobbies/:lobby_id", m.lobbyHandler.GetLobbyPage)
-	protected.PUT("/api/v1/lobbies/:lobby_id/finish", m.lobbyHandler.FinishLobby)
+	{
+		protected.POST("/lobbies/create", m.lobbyHandler.CreateLobby)
+		protected.POST("/lobbies/:lobby_id/join", m.lobbyHandler.JoinLobby)
+		protected.GET("/lobbies/:lobby_id", m.lobbyHandler.GetLobbyPage)
+
+		protected.PUT("/api/v1/lobbies/:lobby_id/finish", m.lobbyHandler.FinishLobby)
+
+		protected.GET("/user/logout", m.userHandler.PerformLogout)
+	}
+
+	router.GET("/", m.lobbyMiddleware.LoadLobbies(), m.userHandler.ShowIndexPage)
 }

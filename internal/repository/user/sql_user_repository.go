@@ -26,14 +26,17 @@ func (r *sqlUserRepository) Create(user *models.User) error {
 }
 
 func (r *sqlUserRepository) FindByUsername(username string) (*models.User, error) {
-	var retrievedUser models.User
-	result := r.db.Where(&models.User{Username: username}).First(&retrievedUser)
+	var user models.User
+	result := r.db.Where("username = ?", username).First(&user)
 
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return nil, ErrUserNotFound
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound // Correctly report that the user is not found.
+		}
+		return nil, result.Error // Handle other potential DB errors.
 	}
 
-	return &retrievedUser, nil
+	return &user, nil
 }
 
 func (r *sqlUserRepository) FindByID(id uint) (*models.User, error) {
