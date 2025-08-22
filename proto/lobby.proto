@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package lobby;
+
+import "google/api/annotations.proto";
+
+option go_package = "gen/lobby";
+
+
+service LobbyService {
+    rpc CreateLobby(CreateLobbyRequest) returns (Lobby) {
+        option (google.api.http) = {
+            post: "/api/v1/lobbies",
+            body: "*"
+        };
+    }
+
+    rpc GetLobby(GetLobbyRequest) returns (Lobby) {
+        option (google.api.http) = {
+            get: "/api/v1/lobbies/{lobby_id}"
+        };
+    }
+
+    rpc JoinLobby(JoinLobbyRequest) returns (Lobby) {
+        option (google.api.http) = {
+            put: "/api/v1/lobbies/{lobby_id}/join",
+            body: "*"
+        };
+    }
+
+    rpc FinishGame(FinishGameRequest) returns (Lobby) {
+        option (google.api.http) = {
+            put: "/api/v1/lobbies/{lobby_id}/finish",
+            body: "*"
+        };
+    }
+
+    rpc ListAvailableLobbies(ListAvailableLobbiesRequest) returns (ListAvailableLobbiesResponse) {
+        option (google.api.http) = {
+            get: "/api/v1/lobbies/available"
+        };
+    }
+}
+
+message Player {
+    uint32 id = 1;
+    string username = 2;
+}
+
+message Lobby {
+    string lobby_id = 1;
+    string name = 2;
+    repeated Player players = 3;
+    string status = 4;
+    optional uint32 winner_id = 5;
+    optional string winner_username = 6;
+}
+
+message CreateLobbyRequest {
+    string name = 1;
+    string username = 2;
+}
+
+message GetLobbyRequest {
+    string lobby_id = 1;
+}
+
+message JoinLobbyRequest {
+    string lobby_id = 1;
+    string username = 2;
+}
+
+message FinishGameRequest {
+    string lobby_id = 1;
+}
+
+message ListAvailableLobbiesRequest {}
+
+message ListAvailableLobbiesResponse {
+    repeated Lobby lobbies = 1;
+}

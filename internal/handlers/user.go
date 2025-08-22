@@ -34,10 +34,13 @@ func NewUserHandler(authService service.AuthService) *UserHandler {
 func (h *UserHandler) ShowIndexPage(c *gin.Context) {
 	isLoggedIn, _ := c.Get("is_logged_in")
 	username, _ := c.Get("username")
+	lobbies, _ := c.Get("lobbies")
+
 	c.HTML(http.StatusOK, indexPageFilename, gin.H{
 		"title":        "Home Page",
 		"is_logged_in": isLoggedIn,
 		"username":     username,
+		"lobbies":      lobbies,
 	})
 }
 
@@ -68,7 +71,7 @@ func (h *UserHandler) PerformRegistration(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "register-successful.html", gin.H{"title": "Successful registration"})
+	c.Redirect(http.StatusSeeOther, "/")
 }
 
 func (h *UserHandler) ShowLoginPage(c *gin.Context) {
@@ -103,7 +106,7 @@ func (h *UserHandler) PerformLogin(c *gin.Context) {
 
 	c.SetCookie("jwt", token, 3600*24, "/", "", false, true)
 	c.Set("is_logged_in", true)
-	c.HTML(http.StatusOK, "login-successful.html", gin.H{"title": "Successful Login"})
+	c.Redirect(http.StatusSeeOther, "/")
 }
 
 func (h *UserHandler) PerformLogout(c *gin.Context) {

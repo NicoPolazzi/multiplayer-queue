@@ -14,6 +14,9 @@ var (
 type LobbyRepository interface {
 	Create(lobby *models.Lobby) error
 	FindByID(lobbyID string) (*models.Lobby, error)
-	UpdateLobbyOpponentAndStatus(lobbyID string, opponentID uint, status models.LobbyStatus) error
-	ListAvailable() []models.Lobby
+	AddPlayer(lobby *models.Lobby, player *models.User) error
+	UpdateStatus(lobby *models.Lobby, status models.LobbyStatus) error
+	UpdateWinner(lobby *models.Lobby, winnerID uint) error
+	Delete(lobbyID string) error
+	ListAvailable() []*models.Lobby
 }

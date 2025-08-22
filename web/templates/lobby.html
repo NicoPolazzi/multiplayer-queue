@@ -1,0 +1,83 @@
+{{ template "header.html" .}}
+
+<div class="container mt-5">
+    <h1>Lobby: {{ .lobby.Name }}</h1>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Lobby Details</h5>
+            <p class="card-text"><strong>ID:</strong> {{ .lobby.LobbyId }}</p>
+            <p class="card-text"><strong>Players:</strong></p>
+            <ul>
+                {{ range .lobby.Players }}
+                <li>{{ .Username }}</li>
+                {{ end }}
+            </ul>
+            <p class="card-text"><strong>Status:</strong> <span id="status">{{ .lobby.Status }}</span></p>
+            <div id="timer-container" class="mt-3" style="display: none;">
+                <h4>Game starting in: <span id="timer">30</span>s</h4>
+            </div>
+            <div id="winner-container" class="mt-3" style="display: none;">
+                <h4>Winner: <span id="winner"></span></h4>
+            </div>
+        </div>
+    </div>
+    <a href="/" class="btn btn-primary mt-3">Back to Lobbies</a>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const lobbyId = "{{ .lobby.LobbyId }}";
+        const playerCount = "{{ len .lobby.Players }}";
+        const initialStatus = "{{ .lobby.Status }}";
+        const winnerUsername = "{{ .lobby.WinnerUsername }}";
+
+        const timerContainer = document.getElementById("timer-container");
+        const timerSpan = document.getElementById("timer");
+        const winnerContainer = document.getElementById("winner-container");
+        const winnerSpan = document.getElementById("winner");
+        const statusSpan = document.getElementById("status");
+
+        function finishGame() {
+            fetch(`/api/v1/lobbies/${lobbyId}/finish`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ lobby_id: lobbyId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    if (data.winnerUsername) {
+                        winnerSpan.textContent = data.winnerUsername;
+                        winnerContainer.style.display = 'block';
+                        statusSpan.textContent = data.status;
+                    }
+                })
+                .catch(err => console.error("Failed to finish game:", err));
+        }
+
+        if (initialStatus === 'FINISHED' && winnerUsername) {
+            winnerSpan.textContent = winnerUsername;
+            winnerContainer.style.display = 'block';
+        }
+
+        if (playerCount === '2' && initialStatus === 'IN_PROGRESS') {
+            timerContainer.style.display = 'block';
+            let timeLeft = 30;
+
+            const interval = setInterval(() => {
+                timeLeft--;
+                timerSpan.textContent = timeLeft;
+
+                if (timeLeft <= 0) {
+                    clearInterval(interval);
+                    timerContainer.style.display = 'none';
+                    finishGame();
+                }
+            }, 1000);
+        }
+    });
+</script>
+
+{{ template "footer.html" .}}

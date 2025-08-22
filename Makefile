@@ -1,4 +1,4 @@
-TESTFOLDER := $(shell go list ./... | grep -v '/cmd$$' | grep -v '/internal/models$$')
+TESTFOLDER := $(shell go list ./... | grep -v '/cmd$$' | grep -v '/internal/models$$' | grep -v '/gen/')
 
 
 check-quality:
