@@ -1,4 +1,4 @@
-package lobbyrepo
+package lobby
 
 import (
 	"errors"

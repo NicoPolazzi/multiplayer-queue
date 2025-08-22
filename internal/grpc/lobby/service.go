@@ -1,4 +1,4 @@
-package grpclobby
+package lobby
 
 import (
 	"context"

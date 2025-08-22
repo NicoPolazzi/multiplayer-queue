@@ -1,4 +1,4 @@
-package usrrepo
+package user
 
 import (
 	"testing"
