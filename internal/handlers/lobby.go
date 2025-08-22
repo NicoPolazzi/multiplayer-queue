@@ -145,7 +145,6 @@ func (h *LobbyHandler) GetLobbyPage(c *gin.Context) {
 func (h *LobbyHandler) FinishLobby(c *gin.Context) {
 	lobbyID := c.Param("lobby_id")
 
-	// Read the request body (optional, since you already have lobbyID from the URL)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})

@@ -55,7 +55,7 @@ func (s *LobbyHandlerTestSuite) TestCreateLobbySuccess() {
 	s.mockResponse = `{"status": "ok"}`
 	s.performPostRequest(CreateLobbyPath, "name=MyNewLobby")
 	s.Equal(http.StatusSeeOther, s.recorder.Code)
-	s.Equal("/", s.recorder.Header().Get("Location"))
+	s.Equal("/lobbies/", s.recorder.Header().Get("Location"))
 }
 
 func (s *LobbyHandlerTestSuite) performPostRequest(path, form string) {
