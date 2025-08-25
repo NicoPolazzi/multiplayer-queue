@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
@@ -58,7 +59,11 @@ func (h *UserHandler) PerformLogin(c *gin.Context) {
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		c.HTML(resp.StatusCode, LoginPageFilename, gin.H{
@@ -100,7 +105,11 @@ func (h *UserHandler) PerformRegistration(c *gin.Context) {
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	// On successful registration, gateway returns 200 OK.
 	if resp.StatusCode == http.StatusOK {

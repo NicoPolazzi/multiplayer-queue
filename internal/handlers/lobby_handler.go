@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
@@ -56,7 +57,11 @@ func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
@@ -124,7 +129,11 @@ func (h *LobbyHandler) JoinLobby(c *gin.Context) {
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusOK {
 		c.Redirect(http.StatusSeeOther, "/lobbies/"+lobbyID)
@@ -148,7 +157,11 @@ func (h *LobbyHandler) GetLobbyPage(c *gin.Context) {
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		c.HTML(resp.StatusCode, "lobby.html", gin.H{
@@ -203,7 +216,11 @@ func (h *LobbyHandler) FinishLobby(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to contact gateway"})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

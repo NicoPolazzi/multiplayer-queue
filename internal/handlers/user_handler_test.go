@@ -45,7 +45,10 @@ func (s *UserHandlerTestSuite) TestPerformLoginSuccess() {
 			Token: "mock-jwt-token",
 			User:  &auth.User{Id: 1, Username: "testuser"},
 		}
-		json.NewEncoder(w).Encode(mockResponse)
+		err := json.NewEncoder(w).Encode(mockResponse)
+		if err != nil {
+			s.Fail("Failed to encoding response")
+		}
 	})
 	s.router.POST("/user/login", s.handler.PerformLogin)
 

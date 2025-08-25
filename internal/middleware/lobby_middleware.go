@@ -39,7 +39,11 @@ func (m *LobbyMiddleware) LoadLobbies() gin.HandlerFunc {
 				c.Next()
 				return
 			}
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					log.Printf("Error closing response body: %v", err)
+				}
+			}()
 
 			if resp.StatusCode != http.StatusOK {
 				log.Printf("LobbyMiddleware: Gateway returned non-OK status: %d", resp.StatusCode)
