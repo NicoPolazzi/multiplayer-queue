@@ -22,7 +22,7 @@ type LobbyServerTestSuite struct {
 	suite.Suite
 	lobbyRepo *MockLobbyRepository
 	usrRepo   *MockUserRepository
-	server    *LobbyService
+	server    lobby.LobbyServiceServer
 }
 
 type MockUserRepository struct {

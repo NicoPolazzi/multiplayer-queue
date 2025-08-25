@@ -28,15 +28,13 @@ func (m *LobbyMiddleware) LoadLobbies() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		isLoggedIn := c.GetBool("is_logged_in")
 
-		// Always set a default value to prevent panics in the template.
 		c.Set("lobbies", []*lobby.Lobby{})
 
-		// Only fetch lobbies if the user is logged in.
 		if isLoggedIn {
 			resp, err := http.Get(m.gatewayBaseURL + "/api/v1/lobbies/available")
 			if err != nil {
 				log.Printf("LobbyMiddleware: Could not connect to lobby service: %v", err)
-				c.Set("ErrorTitle", "Service Error")
+				c.Set("ErrorTitle", lobbyErrorTitle)
 				c.Set("ErrorMessage", "Could not retrieve the list of available lobbies. Please try again later.")
 				c.Next()
 				return
@@ -45,7 +43,7 @@ func (m *LobbyMiddleware) LoadLobbies() gin.HandlerFunc {
 
 			if resp.StatusCode != http.StatusOK {
 				log.Printf("LobbyMiddleware: Gateway returned non-OK status: %d", resp.StatusCode)
-				c.Set("ErrorTitle", "Service Error")
+				c.Set("ErrorTitle", lobbyErrorTitle)
 				c.Set("ErrorMessage", "There was a problem retrieving the list of lobbies.")
 				c.Next()
 				return
@@ -54,7 +52,7 @@ func (m *LobbyMiddleware) LoadLobbies() gin.HandlerFunc {
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				log.Printf("LobbyMiddleware: Failed to read response body: %v", err)
-				c.Set("ErrorTitle", "Response Error")
+				c.Set("ErrorTitle", lobbyErrorTitle)
 				c.Set("ErrorMessage", "Received an unreadable response while fetching lobbies.")
 				c.Next()
 				return
@@ -63,13 +61,12 @@ func (m *LobbyMiddleware) LoadLobbies() gin.HandlerFunc {
 			var lobbyList lobby.ListAvailableLobbiesResponse
 			if err := protojson.Unmarshal(body, &lobbyList); err != nil {
 				log.Printf("LobbyMiddleware: Failed to parse lobby list: %v", err)
-				c.Set("ErrorTitle", "Response Error")
+				c.Set("ErrorTitle", lobbyErrorTitle)
 				c.Set("ErrorMessage", "Received an invalid response while fetching lobbies.")
 				c.Next()
 				return
 			}
 
-			// On success, overwrite the default empty slice with the real data.
 			c.Set("lobbies", lobbyList.Lobbies)
 		}
 

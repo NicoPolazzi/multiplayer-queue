@@ -51,13 +51,11 @@ func (r *sqlLobbyRepository) UpdateWinner(lobby *models.Lobby, winnerID uint) er
 func (r *sqlLobbyRepository) Delete(lobbyID string) error {
 	var lobby models.Lobby
 	if err := r.db.First(&lobby, "lobby_id = ?", lobbyID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrLobbyNotFound
-		}
+		return ErrLobbyNotFound
 	}
 
 	if err := r.db.Model(&lobby).Association("Players").Clear(); err != nil {
-		return err
+		return ErrLobbyCleanupFailed
 	}
 
 	r.db.Delete(&lobby)

@@ -152,6 +152,7 @@ func (s *AuthServerTestSuite) TestLoginUserWhenUserNotFound() {
 	st, ok := status.FromError(err)
 	s.True(ok)
 	s.Equal(codes.NotFound, st.Code())
+	s.Equal(st.Message(), "invalid credentials")
 	s.jwtManager.AssertNotCalled(s.T(), "Create", mock.Anything)
 }
 
@@ -187,6 +188,20 @@ func (s *AuthServerTestSuite) TestLoginUserWhenTokenCreationFails() {
 	s.True(ok)
 	s.Equal(codes.Internal, st.Code())
 	s.jwtManager.AssertExpectations(s.T())
+}
+
+func (s *AuthServerTestSuite) TestLoginUserWhenCanNotRetrieveUser() {
+	req := &pb.LoginUserRequest{Username: "existing", Password: "password123"}
+	s.usrRepo.On("FindByUsername", "existing").Return(nil, errors.New("internal error"))
+
+	resp, err := s.server.LoginUser(context.Background(), req)
+
+	s.Empty(resp)
+	st, ok := status.FromError(err)
+	s.True(ok)
+	s.Equal(codes.Internal, st.Code())
+	s.Equal(st.Message(), "failed to retrieve user: internal error")
+	s.jwtManager.AssertNotCalled(s.T(), "Create", mock.Anything)
 }
 
 func TestAuthServer(t *testing.T) {

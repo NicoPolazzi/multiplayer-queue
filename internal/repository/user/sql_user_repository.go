@@ -30,10 +30,7 @@ func (r *sqlUserRepository) FindByUsername(username string) (*models.User, error
 	result := r.db.Where("username = ?", username).First(&user)
 
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound // Correctly report that the user is not found.
-		}
-		return nil, result.Error // Handle other potential DB errors.
+		return nil, ErrUserNotFound
 	}
 
 	return &user, nil

@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrLobbyExists   = errors.New("lobby already exists in the database")
-	ErrLobbyNotFound = errors.New("lobby not found in the database")
+	ErrLobbyExists        = errors.New("lobby already exists in the database")
+	ErrLobbyNotFound      = errors.New("lobby not found in the database")
+	ErrLobbyCleanupFailed = errors.New("failed to clean up lobby associations")
 )
 
 type LobbyRepository interface {

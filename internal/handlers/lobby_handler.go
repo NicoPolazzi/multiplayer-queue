@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"bytes"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
@@ -13,8 +11,7 @@ import (
 )
 
 const (
-	CreateLobbyPath   = "/lobbies/create"
-	errorHTMLFilename = "error.html"
+	indexPageFilename = "index.html"
 )
 
 type LobbyHandler struct {
@@ -28,7 +25,10 @@ func NewLobbyHandler(gatewayBaseURL string) *LobbyHandler {
 func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 	lobbyName := c.PostForm("name")
 	if lobbyName == "" {
-		c.HTML(http.StatusBadRequest, errorHTMLFilename, gin.H{"message": "Lobby name cannot be empty."})
+		c.HTML(http.StatusBadRequest, indexPageFilename, gin.H{
+			"ErrorTitle":   "Lobby Creation Failed",
+			"ErrorMessage": "Lobby name cannot be empty.",
+		})
 		return
 	}
 
@@ -39,40 +39,52 @@ func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 		Name:     lobbyName,
 		Username: username,
 	}
-	reqBody, _ := protojson.Marshal(createReq)
-
-	resp, err := http.Post(h.gatewayBaseURL+"/api/v1/lobbies", "application/json", bytes.NewBuffer(reqBody))
+	reqBody, err := protojson.Marshal(createReq)
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{
-			"message": "Failed to send create request to lobby service."})
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Lobby Creation Failed",
+			"ErrorMessage": "Could not prepare the request.",
+		})
 		return
 	}
 
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Error closing response body: %v", err)
-		}
-	}()
-
-	if resp.StatusCode == http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to read lobby creation response."})
-			return
-		}
-
-		var newLobby lobby.Lobby
-		if err := protojson.Unmarshal(body, &newLobby); err != nil {
-			c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to parse lobby creation response."})
-			return
-		}
-
-		c.Redirect(http.StatusSeeOther, "/lobbies/"+newLobby.LobbyId)
-	} else {
-		body, _ := io.ReadAll(resp.Body)
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{
-			"message": fmt.Sprintf("Failed to create lobby: %s", string(body))})
+	resp, err := http.Post(h.gatewayBaseURL+"/api/v1/lobbies", "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Lobby Creation Failed",
+			"ErrorMessage": "The server is currently unavailable. Please try again later.",
+		})
+		return
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Lobby Creation Failed",
+			"ErrorMessage": "An unexpected error occurred while creating the lobby.",
+		})
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Lobby Creation Failed",
+			"ErrorMessage": "Could not read the server response.",
+		})
+		return
+	}
+
+	var newLobby lobby.Lobby
+	if err := protojson.Unmarshal(body, &newLobby); err != nil {
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Lobby Creation Failed",
+			"ErrorMessage": "Could not understand the server response.",
+		})
+		return
+	}
+
+	c.Redirect(http.StatusSeeOther, "/lobbies/"+newLobby.LobbyId)
 }
 
 func (h *LobbyHandler) JoinLobby(c *gin.Context) {
@@ -84,34 +96,44 @@ func (h *LobbyHandler) JoinLobby(c *gin.Context) {
 		LobbyId:  lobbyID,
 		Username: username,
 	}
-	reqBody, _ := protojson.Marshal(joinReq)
+	reqBody, err := protojson.Marshal(joinReq)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Join Lobby Failed",
+			"ErrorMessage": "Could not prepare the request.",
+		})
+		return
+	}
 
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodPut, h.gatewayBaseURL+"/api/v1/lobbies/"+lobbyID+"/join", bytes.NewBuffer(reqBody))
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to create join request."})
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Join Lobby Failed",
+			"ErrorMessage": "Could not create the join request.",
+		})
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to send join request to lobby service."})
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Join Lobby Failed",
+			"ErrorMessage": "The server is currently unavailable. Please try again later.",
+		})
 		return
 	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Error closing response body: %v", err)
-		}
-	}()
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		c.Redirect(http.StatusSeeOther, "/lobbies/"+lobbyID)
 	} else {
-		body, _ := io.ReadAll(resp.Body)
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{
-			"message": fmt.Sprintf("Failed to join lobby: %s", string(body))})
+		// SUGGESTION: You could parse the error from resp.Body to show a more specific message
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Join Lobby Failed",
+			"ErrorMessage": "An unexpected error occurred while joining the lobby.",
+		})
 	}
 }
 
@@ -120,30 +142,37 @@ func (h *LobbyHandler) GetLobbyPage(c *gin.Context) {
 
 	resp, err := http.Get(h.gatewayBaseURL + "/api/v1/lobbies/" + lobbyID)
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to get lobby details."})
+		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
+			"ErrorTitle":   "Error Fetching Lobby",
+			"ErrorMessage": "The server is currently unavailable.",
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.HTML(resp.StatusCode, "lobby.html", gin.H{
+			"ErrorTitle":   "Error Fetching Lobby",
+			"ErrorMessage": "Could not find the requested lobby.",
+		})
 		return
 	}
 
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Error closing response body: %v", err)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		c.HTML(resp.StatusCode, errorHTMLFilename, gin.H{"message": fmt.Sprintf("Failed to get lobby details: %s", string(body))})
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "lobby.html", gin.H{
+			"ErrorTitle":   "Error Fetching Lobby",
+			"ErrorMessage": "Failed to read the server's response.",
+		})
 		return
 	}
 
 	var lobbyResponse lobby.Lobby
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to read lobby details response."})
-		return
-	}
 	if err := protojson.Unmarshal(body, &lobbyResponse); err != nil {
-		c.HTML(http.StatusInternalServerError, errorHTMLFilename, gin.H{"message": "Failed to parse lobby details."})
+		c.HTML(http.StatusInternalServerError, "lobby.html", gin.H{
+			"ErrorTitle":   "Error Fetching Lobby",
+			"ErrorMessage": "Failed to understand the server's response.",
+		})
 		return
 	}
 
@@ -161,7 +190,6 @@ func (h *LobbyHandler) FinishLobby(c *gin.Context) {
 		return
 	}
 
-	// Forward the request to the gateway
 	req, err := http.NewRequest(http.MethodPut, h.gatewayBaseURL+"/api/v1/lobbies/"+lobbyID+"/finish", bytes.NewBuffer(body))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request to gateway"})
@@ -175,12 +203,7 @@ func (h *LobbyHandler) FinishLobby(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to contact gateway"})
 		return
 	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Error closing response body: %v", err)
-		}
-	}()
+	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -188,5 +211,6 @@ func (h *LobbyHandler) FinishLobby(c *gin.Context) {
 		return
 	}
 
-	c.Data(resp.StatusCode, "application/json", respBody)
+	// Proxy the status code and body from the gateway
+	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), respBody)
 }
