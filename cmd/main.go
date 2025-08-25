@@ -2,118 +2,92 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
-	grpcauth "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/auth"
-	grpclobby "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/lobby"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
-	lobbyrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/lobby"
-	usrRepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/routes"
-	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
 	"github.com/gin-gonic/gin"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/joho/godotenv"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
+// The program sets an http server using GIN to handle user requests. There requests are then translated by a gRPC
+// gateway in RPCs handled by a gRPC server. Two gRPC services are available: auth and lobby. The former handles user
+// authentication tasks, such as login and registration. The latter handles all lobby related task, such as the
+// creation and the joining in a lobby.
 func main() {
-	// Check values in .env file
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	host := os.Getenv("HOST")
-	if host == "" {
-		host = "localhost"
-	}
-
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET not set in .env file")
-	}
-	key := []byte(jwtSecret)
-
-	// Set db connection and schema
-	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+	cfg, err := LoadConfig()
 	if err != nil {
-		log.Fatal("failed to connect to database:", err)
+		log.Fatalf("failed to load configuration: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.User{}, &models.Lobby{}); err != nil {
-		log.Fatal("migration failed:", err)
+	db, err := NewDatabaseConnection()
+	if err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
 	}
 
-	gatewayEndpoint := "http://" + host + ":8081"
+	// Perform Dependencies Injection
+	container := BuildContainer(db, cfg)
 
-	userRepo := usrRepo.NewSQLUserRepository(db)
-	lobbyRepo := lobbyrepo.NewSQLLobbyRepository(db)
-	tokenManager := token.NewJWTTokenManager(key)
-	userHandler := handlers.NewUserHandler(gatewayEndpoint)
-	lobbyHandler := handlers.NewLobbyHandler(gatewayEndpoint)
-	lobbyMiddleware := middleware.NewLobbyMiddleware(gatewayEndpoint)
-	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
-	routesManager := routes.NewRoutes(userHandler, lobbyHandler, authMiddleware, lobbyMiddleware)
+	// Use an error group to manage concurrent servers
+	g, ctx := errgroup.WithContext(context.Background())
 
-	// TODO: review the initialization of the server and gateway
-	// gRPC server setup
-	go func() {
-		lis, err := net.Listen("tcp", host+":9090")
-		if err != nil {
-			log.Fatalf("failed to listen for gRPC: %v", err)
-		}
-		s := grpc.NewServer()
-		lobbyServer := grpclobby.NewLobbyService(lobbyRepo, userRepo)
-		lobby.RegisterLobbyServiceServer(s, lobbyServer)
-		authServer := grpcauth.NewAuthService(userRepo, tokenManager)
-		auth.RegisterAuthServiceServer(s, authServer)
-		log.Println("gRPC server listening at", lis.Addr())
-		if err := s.Serve(lis); err != nil {
-			log.Fatalf("failed to serve gRPC: %v", err)
-		}
-	}()
+	g.Go(func() error {
+		return runGRPCServer(container, cfg)
+	})
 
-	// gRPC gateway setup
-	go func() {
-		ctx := context.Background()
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+	g.Go(func() error {
+		return runGRPCGateway(ctx, cfg)
+	})
 
-		mux := runtime.NewServeMux()
-		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-		grpcServerEndpoint := host + ":9090"
-		err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, grpcServerEndpoint, opts)
-		if err != nil {
-			log.Fatalf("Failed to register gRPC gateway: %v", err)
-		}
-		err = auth.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, grpcServerEndpoint, opts)
-		if err != nil {
-			log.Fatalf("Failed to register Auth gRPC gateway: %v", err)
-		}
+	g.Go(func() error {
+		return runGinServer(container, cfg)
+	})
 
-		log.Println("gRPC gateway listening at :8081")
-		if err := http.ListenAndServe(":8081", mux); err != nil {
-			log.Fatalf("Failed to serve gRPC gateway: %v", err)
-		}
-	}()
+	log.Println("Application started. Waiting for servers to exit.")
+	if err := g.Wait(); err != nil {
+		log.Fatalf("A server failed to run: %v", err)
+	}
+}
 
+func runGRPCServer(container *AppContainer, cfg *Config) error {
+	lis, err := net.Listen("tcp", cfg.GRPCServerAddr)
+	if err != nil {
+		return fmt.Errorf("failed to listen for gRPC: %w", err)
+	}
+	s := grpc.NewServer()
+	lobby.RegisterLobbyServiceServer(s, container.LobbyService)
+	auth.RegisterAuthServiceServer(s, container.AuthService)
+
+	log.Println("gRPC server listening at", lis.Addr())
+	return s.Serve(lis)
+}
+
+func runGRPCGateway(ctx context.Context, cfg *Config) error {
+	mux := runtime.NewServeMux()
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+
+	if err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, cfg.GRPCServerAddr, opts); err != nil {
+		return fmt.Errorf("failed to register Lobby gRPC gateway: %w", err)
+	}
+	if err := auth.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, cfg.GRPCServerAddr, opts); err != nil {
+		return fmt.Errorf("failed to register Auth gRPC gateway: %w", err)
+	}
+
+	log.Println("gRPC gateway listening at", cfg.GRPCGatewayAddr)
+	return http.ListenAndServe(cfg.GRPCGatewayAddr, mux)
+}
+
+func runGinServer(container *AppContainer, cfg *Config) error {
 	router := gin.Default()
 	router.LoadHTMLGlob("web/templates/*")
-	routesManager.InitializeRoutes(router)
-	log.Printf("Gin Server is running on http://%s:8080", host)
-	err = router.Run(":8080")
-	if err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
+	container.RoutesManager.InitializeRoutes(router)
 
+	log.Printf("Gin Server is running on http://%s%s", cfg.Host, cfg.GinServerAddr)
+	return router.Run(cfg.GinServerAddr)
 }
