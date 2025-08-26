@@ -7,66 +7,20 @@ import (
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 )
 
-// We are not testing the logic of the handlers
-// or middleware here, only that they are correctly assigned.
-type mockUserHandler struct{}
-type mockLobbyHandler struct{}
-type mockAuthMiddleware struct{}
-type mockLobbyMiddleware struct{}
-
-func (h *mockUserHandler) ShowRegisterPage(c *gin.Context)    {}
-func (h *mockUserHandler) PerformRegistration(c *gin.Context) {}
-func (h *mockUserHandler) ShowLoginPage(c *gin.Context)       {}
-func (h *mockUserHandler) PerformLogin(c *gin.Context)        {}
-func (h *mockUserHandler) PerformLogout(c *gin.Context)       {}
-func (h *mockUserHandler) ShowIndexPage(c *gin.Context)       {}
-
-func (h *mockLobbyHandler) CreateLobby(c *gin.Context)  {}
-func (h *mockLobbyHandler) JoinLobby(c *gin.Context)    {}
-func (h *mockLobbyHandler) GetLobbyPage(c *gin.Context) {}
-func (h *mockLobbyHandler) FinishLobby(c *gin.Context)  {}
-
-func (m *mockAuthMiddleware) CheckUser() gin.HandlerFunc {
-	return func(c *gin.Context) {}
-}
-
-func (m *mockLobbyMiddleware) LoadLobbies() gin.HandlerFunc {
-	return func(c *gin.Context) {}
-}
-
-type RoutesManagerTestSuite struct {
-	suite.Suite
-	router              *gin.Engine
-	mockUserHandler     *handlers.UserHandler
-	mockLobbyHandler    *handlers.LobbyHandler
-	mockAuthMiddleware  *middleware.AuthMiddleware
-	mockLobbyMiddleware *middleware.LobbyMiddleware
-}
-
-func (s *RoutesManagerTestSuite) SetupTest() {
+func TestInitializeRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	router := gin.New()
 
-	s.mockUserHandler = &handlers.UserHandler{}
-	s.mockLobbyHandler = &handlers.LobbyHandler{}
-	s.mockAuthMiddleware = &middleware.AuthMiddleware{}
-	s.mockLobbyMiddleware = &middleware.LobbyMiddleware{}
-
-	s.router = gin.New()
-}
-
-func (s *RoutesManagerTestSuite) TestInitializeRoutes() {
 	manager := NewRoutes(
-		s.mockUserHandler,
-		s.mockLobbyHandler,
-		s.mockAuthMiddleware,
-		s.mockLobbyMiddleware,
+		&handlers.UserHandler{},
+		&handlers.LobbyHandler{},
+		&middleware.AuthMiddleware{},
+		&middleware.LobbyMiddleware{},
 	)
-	manager.InitializeRoutes(s.router)
-
-	registeredRoutes := s.router.Routes()
+	manager.InitializeRoutes(router)
 
 	expectedRoutes := []struct {
 		Method string
@@ -84,24 +38,16 @@ func (s *RoutesManagerTestSuite) TestInitializeRoutes() {
 		{http.MethodGet, "/"},
 	}
 
-	s.Len(registeredRoutes, len(expectedRoutes), "The number of registered routes should match the expected count.")
+	registeredRoutes := router.Routes()
+	assert.Len(t, registeredRoutes, len(expectedRoutes), "The number of registered routes should match the expected count.")
+
+	routeMap := make(map[string]bool)
+	for _, route := range registeredRoutes {
+		routeMap[route.Method+route.Path] = true
+	}
 
 	for _, expected := range expectedRoutes {
-		s.assertRouteExists(registeredRoutes, expected.Method, expected.Path)
+		key := expected.Method + expected.Path
+		assert.True(t, routeMap[key], "Route %s %s was not registered.", expected.Method, expected.Path)
 	}
-}
-
-func (s *RoutesManagerTestSuite) assertRouteExists(routes gin.RoutesInfo, method, path string) {
-	found := false
-	for _, route := range routes {
-		if route.Method == method && route.Path == path {
-			found = true
-			break
-		}
-	}
-	s.True(found, "Route %s %s was not registered.", method, path)
-}
-
-func TestRoutes(t *testing.T) {
-	suite.Run(t, new(RoutesManagerTestSuite))
 }
