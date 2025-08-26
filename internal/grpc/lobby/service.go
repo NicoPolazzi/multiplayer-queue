@@ -1,4 +1,4 @@
-package grpc
+package lobby
 
 import (
 	"context"
@@ -12,20 +12,20 @@ import (
 	"github.com/google/uuid"
 )
 
-type LobbyServer struct {
+type LobbyService struct {
 	lobby.UnimplementedLobbyServiceServer
 	lobbyRepo lobbyrepo.LobbyRepository
 	userRepo  usrrepo.UserRepository
 }
 
-func NewLobbyServer(lobbyRepo lobbyrepo.LobbyRepository, userRepo usrrepo.UserRepository) *LobbyServer {
-	return &LobbyServer{
+func NewLobbyService(lobbyRepo lobbyrepo.LobbyRepository, userRepo usrrepo.UserRepository) lobby.LobbyServiceServer {
+	return &LobbyService{
 		lobbyRepo: lobbyRepo,
 		userRepo:  userRepo,
 	}
 }
 
-func (s *LobbyServer) CreateLobby(ctx context.Context, req *lobby.CreateLobbyRequest) (*lobby.Lobby, error) {
+func (s *LobbyService) CreateLobby(ctx context.Context, req *lobby.CreateLobbyRequest) (*lobby.Lobby, error) {
 	creator, err := s.userRepo.FindByUsername(req.GetUsername())
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func (s *LobbyServer) CreateLobby(ctx context.Context, req *lobby.CreateLobbyReq
 	return toProtoLobby(newLobby), nil
 }
 
-func (s *LobbyServer) JoinLobby(ctx context.Context, req *lobby.JoinLobbyRequest) (*lobby.Lobby, error) {
+func (s *LobbyService) JoinLobby(ctx context.Context, req *lobby.JoinLobbyRequest) (*lobby.Lobby, error) {
 	player, err := s.userRepo.FindByUsername(req.GetUsername())
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (s *LobbyServer) JoinLobby(ctx context.Context, req *lobby.JoinLobbyRequest
 	return toProtoLobby(lobbyToJoin), nil
 }
 
-func (s *LobbyServer) FinishGame(ctx context.Context, req *lobby.FinishGameRequest) (*lobby.Lobby, error) {
+func (s *LobbyService) FinishGame(ctx context.Context, req *lobby.FinishGameRequest) (*lobby.Lobby, error) {
 	gameLobby, err := s.lobbyRepo.FindByID(req.GetLobbyId())
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func (s *LobbyServer) FinishGame(ctx context.Context, req *lobby.FinishGameReque
 	return toProtoLobby(gameLobby), nil
 }
 
-func (s *LobbyServer) GetLobby(ctx context.Context, req *lobby.GetLobbyRequest) (*lobby.Lobby, error) {
+func (s *LobbyService) GetLobby(ctx context.Context, req *lobby.GetLobbyRequest) (*lobby.Lobby, error) {
 	foundLobby, err := s.lobbyRepo.FindByID(req.GetLobbyId())
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (s *LobbyServer) GetLobby(ctx context.Context, req *lobby.GetLobbyRequest) 
 	return toProtoLobby(foundLobby), nil
 }
 
-func (s *LobbyServer) ListAvailableLobbies(ctx context.Context, req *lobby.ListAvailableLobbiesRequest) (*lobby.ListAvailableLobbiesResponse, error) {
+func (s *LobbyService) ListAvailableLobbies(ctx context.Context, req *lobby.ListAvailableLobbiesRequest) (*lobby.ListAvailableLobbiesResponse, error) {
 	lobbies := s.lobbyRepo.ListAvailable()
 	protoLobbies := make([]*lobby.Lobby, len(lobbies))
 	for i, l := range lobbies {

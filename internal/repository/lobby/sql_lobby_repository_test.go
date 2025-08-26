@@ -1,4 +1,4 @@
-package lobbyrepo
+package lobby
 
 import (
 	"testing"
@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	fixtureLobbyName = "Test Lobby"
+	fixtureLobbyName      = "Test Lobby"
+	fixtureLobbyCondition = "lobby_id = ?"
 )
 
 type LobbySQLRepositoryTestSuite struct {
@@ -123,7 +124,7 @@ func (s *LobbySQLRepositoryTestSuite) TestUpdateStatusSuccess() {
 	err := s.lobbyRepo.UpdateStatus(&lobby, models.LobbyStatusInProgress)
 	s.NoError(err)
 	var updatedLobby models.Lobby
-	s.db.First(&updatedLobby, "lobby_id = ?", lobby.LobbyID)
+	s.db.First(&updatedLobby, fixtureLobbyCondition, lobby.LobbyID)
 	s.Equal(models.LobbyStatusInProgress, updatedLobby.Status)
 }
 
@@ -133,7 +134,7 @@ func (s *LobbySQLRepositoryTestSuite) TestUpdateWinnerSuccess() {
 	err := s.lobbyRepo.UpdateWinner(&lobby, winner.ID)
 	s.NoError(err)
 	var updatedLobby models.Lobby
-	s.db.First(&updatedLobby, "lobby_id = ?", lobby.LobbyID)
+	s.db.First(&updatedLobby, fixtureLobbyCondition, lobby.LobbyID)
 	s.Equal(winner.ID, *updatedLobby.WinnerID)
 }
 
@@ -143,7 +144,7 @@ func (s *LobbySQLRepositoryTestSuite) TestDeleteSuccess() {
 	player2 := s.createUserInDB("player2", &lobby.LobbyID)
 	err := s.lobbyRepo.Delete(lobby.LobbyID)
 	s.NoError(err)
-	err = s.db.First(&lobby, "lobby_id = ?", lobby.LobbyID).Error
+	err = s.db.First(&lobby, fixtureLobbyCondition, lobby.LobbyID).Error
 	s.ErrorIs(err, gorm.ErrRecordNotFound)
 	var updatedPlayer1 models.User
 	s.db.First(&updatedPlayer1, player1.ID)
@@ -151,6 +152,22 @@ func (s *LobbySQLRepositoryTestSuite) TestDeleteSuccess() {
 	var updatedPlayer2 models.User
 	s.db.First(&updatedPlayer2, player2.ID)
 	s.Empty(updatedPlayer2.LobbyID)
+}
+
+func (s *LobbySQLRepositoryTestSuite) TestDeleteWhenAssociationClearFails() {
+	lobby := s.createLobbyInDB(fixtureLobbyName, models.LobbyStatusInProgress)
+	s.createUserInDB("a_player", &lobby.LobbyID)
+
+	err := s.db.Migrator().DropTable(&models.User{})
+	s.Require().NoError(err, "Dropping user table for test setup should not fail")
+
+	deleteErr := s.lobbyRepo.Delete(lobby.LobbyID)
+	s.ErrorIs(deleteErr, ErrLobbyCleanupFailed)
+
+	// Verify the lobby was NOT deleted, as the process failed before the final deletion step.
+	var foundLobby models.Lobby
+	findErr := s.db.First(&foundLobby, fixtureLobbyCondition, lobby.LobbyID).Error
+	s.NoError(findErr, "Lobby should still exist because the transaction should have failed")
 }
 
 func (s *LobbySQLRepositoryTestSuite) TestDeleteNotFound() {

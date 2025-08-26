@@ -47,7 +47,7 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValid() {
 
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
 	s.context.Request.AddCookie(&http.Cookie{
-		Name:  "jwt",
+		Name:  "token",
 		Value: validToken,
 	})
 
@@ -77,7 +77,7 @@ func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsInvalid() {
 	s.tokenManager.On("Validate", invalidToken).Return("", token.ErrInvalidToken)
 	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
 	s.context.Request.AddCookie(&http.Cookie{
-		Name:  "jwt",
+		Name:  "token",
 		Value: invalidToken,
 	})
 
