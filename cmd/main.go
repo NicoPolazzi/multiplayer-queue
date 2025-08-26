@@ -23,15 +23,14 @@ import (
 func main() {
 	cfg, err := LoadConfig()
 	if err != nil {
-		log.Fatalf("failed to load configuration: %v", err)
+		log.Fatal(err)
 	}
 
-	db, err := NewDatabaseConnection()
+	db, err := NewDatabaseConnection(cfg)
 	if err != nil {
-		log.Fatalf("failed to initialize database: %v", err)
+		log.Fatal(err)
 	}
 
-	// Perform Dependencies Injection
 	container := BuildContainer(db, cfg)
 
 	// Use an error group to manage concurrent servers
@@ -56,7 +55,8 @@ func main() {
 }
 
 func runGRPCServer(container *AppContainer, cfg *Config) error {
-	lis, err := net.Listen("tcp", cfg.GRPCServerAddr)
+	listenAddr := fmt.Sprintf(":%s", cfg.GRPCServerPort)
+	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen for gRPC: %w", err)
 	}
@@ -71,23 +71,28 @@ func runGRPCServer(container *AppContainer, cfg *Config) error {
 func runGRPCGateway(ctx context.Context, cfg *Config) error {
 	mux := runtime.NewServeMux()
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	grpcEndpoint := fmt.Sprintf("%s:%s", cfg.Host, cfg.GRPCServerPort)
 
-	if err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, cfg.GRPCServerAddr, opts); err != nil {
+	if err := lobby.RegisterLobbyServiceHandlerFromEndpoint(ctx, mux, grpcEndpoint, opts); err != nil {
 		return fmt.Errorf("failed to register Lobby gRPC gateway: %w", err)
 	}
-	if err := auth.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, cfg.GRPCServerAddr, opts); err != nil {
+	if err := auth.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, grpcEndpoint, opts); err != nil {
 		return fmt.Errorf("failed to register Auth gRPC gateway: %w", err)
 	}
 
-	log.Println("gRPC gateway listening at", cfg.GRPCGatewayAddr)
-	return http.ListenAndServe(cfg.GRPCGatewayAddr, mux)
+	listenAddr := fmt.Sprintf(":%s", cfg.GRPCGatewayPort)
+	log.Println("gRPC gateway listening at", listenAddr)
+	return http.ListenAndServe(listenAddr, mux)
 }
 
 func runGinServer(container *AppContainer, cfg *Config) error {
+	gin.SetMode(cfg.GinMode)
 	router := gin.Default()
+	router.SetTrustedProxies(nil)
 	router.LoadHTMLGlob("web/templates/*")
 	container.RoutesManager.InitializeRoutes(router)
 
-	log.Printf("Gin Server is running on http://%s%s", cfg.Host, cfg.GinServerAddr)
-	return router.Run(cfg.GinServerAddr)
+	listenAddr := fmt.Sprintf(":%s", cfg.GinServerPort)
+	log.Printf("Gin Server is running on http://%s%s", cfg.Host, listenAddr)
+	return router.Run(listenAddr)
 }

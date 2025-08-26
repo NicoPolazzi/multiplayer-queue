@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
 	grpcauth "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/auth"
@@ -14,33 +16,28 @@ import (
 	"gorm.io/gorm"
 )
 
-// AppContainer holds all the dependencies for the application.
+// AppContainer holds all the dependencies useful for the application.
 type AppContainer struct {
 	RoutesManager *routes.RoutesManager
 	LobbyService  lobby.LobbyServiceServer
 	AuthService   auth.AuthServiceServer
 }
 
+// BuildContainer is responsible to inject all the dependencies needed by the application.
 func BuildContainer(db *gorm.DB, cfg *Config) *AppContainer {
-	gatewayEndpoint := "http://" + cfg.Host + ":8081"
-
-	// Repositories
 	userRepo := usrRepo.NewSQLUserRepository(db)
 	lobbyRepo := lobbyrepo.NewSQLLobbyRepository(db)
 
-	// Services & Managers
-	tokenManager := token.NewJWTTokenManager(cfg.JWTKey)
+	tokenManager := token.NewJWTTokenManager([]byte(cfg.JWTSecret))
 
-	// Handlers & Middleware
-	userHandler := handlers.NewUserHandler(gatewayEndpoint)
-	lobbyHandler := handlers.NewLobbyHandler(gatewayEndpoint)
-	lobbyMiddleware := middleware.NewLobbyMiddleware(gatewayEndpoint)
+	gatewayURL := fmt.Sprintf("http://%s:%s", cfg.Host, cfg.GRPCGatewayPort)
+	userHandler := handlers.NewUserHandler(gatewayURL)
+	lobbyHandler := handlers.NewLobbyHandler(gatewayURL)
+	lobbyMiddleware := middleware.NewLobbyMiddleware(gatewayURL)
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
 
-	// Routes
 	routesManager := routes.NewRoutes(userHandler, lobbyHandler, authMiddleware, lobbyMiddleware)
 
-	// gRPC Services
 	lobbyService := grpclobby.NewLobbyService(lobbyRepo, userRepo)
 	authService := grpcauth.NewAuthService(userRepo, tokenManager)
 

@@ -8,8 +8,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewDatabaseConnection() (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+func NewDatabaseConnection(cfg *Config) (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open(cfg.DB_DSN), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}

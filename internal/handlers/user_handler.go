@@ -83,7 +83,7 @@ func (h *UserHandler) PerformLogin(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("token", loginResponse.Token, 3600, "/", "localhost", false, true)
+	c.SetCookie("token", loginResponse.Token, 3600, "/", "", false, true)
 	c.Redirect(http.StatusSeeOther, "/")
 }
 
@@ -133,6 +133,6 @@ func (h *UserHandler) PerformRegistration(c *gin.Context) {
 }
 
 func (h *UserHandler) PerformLogout(c *gin.Context) {
-	c.SetCookie("token", "", -1, "/", "localhost", false, true)
+	c.SetCookie("token", "", -1, "/", "", false, true)
 	c.Redirect(http.StatusSeeOther, "/")
 }
