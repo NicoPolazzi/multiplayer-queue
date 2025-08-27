@@ -140,7 +140,6 @@ func (h *LobbyHandler) JoinLobby(c *gin.Context) {
 	if resp.StatusCode == http.StatusOK {
 		c.Redirect(http.StatusSeeOther, "/lobbies/"+lobbyID)
 	} else {
-		// SUGGESTION: You could parse the error from resp.Body to show a more specific message
 		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
 			"ErrorTitle":   "Join Lobby Failed",
 			"ErrorMessage": "An unexpected error occurred while joining the lobby.",
@@ -192,7 +191,9 @@ func (h *LobbyHandler) GetLobbyPage(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "lobby.html", gin.H{
-		"lobby": &lobbyResponse,
+		"lobby":        &lobbyResponse,
+		"is_logged_in": c.GetBool("is_logged_in"),
+		"username":     c.GetString("username"),
 	})
 }
 
