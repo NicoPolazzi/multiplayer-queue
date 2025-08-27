@@ -67,6 +67,8 @@ func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
 			"ErrorTitle":   "Lobby Creation Failed",
 			"ErrorMessage": "An unexpected error occurred while creating the lobby.",
+			"is_logged_in": true,
+			"username":     username,
 		})
 		return
 	}

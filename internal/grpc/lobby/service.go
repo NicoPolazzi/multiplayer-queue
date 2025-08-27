@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"strings"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
@@ -29,6 +30,10 @@ func (s *LobbyService) CreateLobby(ctx context.Context, req *lobby.CreateLobbyRe
 	creator, err := s.userRepo.FindByUsername(req.GetUsername())
 	if err != nil {
 		return nil, err
+	}
+
+	if strings.TrimSpace(req.GetName()) == "" {
+		return nil, errors.New("lobby name cannot be empty")
 	}
 
 	newLobby := &models.Lobby{

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
@@ -29,6 +30,10 @@ func NewAuthService(repo usrrepo.UserRepository, manager token.TokenManager) aut
 func (s *AuthService) RegisterUser(ctx context.Context, req *auth.RegisterUserRequest) (*auth.User, error) {
 	if _, err := s.userRepository.FindByUsername(req.GetUsername()); err == nil {
 		return nil, status.Errorf(codes.AlreadyExists, "username is already taken")
+	}
+
+	if strings.TrimSpace(req.GetUsername()) == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "username cannot be empty")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.GetPassword()), bcrypt.DefaultCost)
