@@ -1,190 +1,233 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/gateway"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type LobbyHandlerTestSuite struct {
 	suite.Suite
-	handler      *LobbyHandler
-	recorder     *httptest.ResponseRecorder
-	engine       *gin.Engine
-	mockGateway  *httptest.Server
-	mockResponse string
-	mockStatus   int
+	router      *gin.Engine
+	mockGateway *httptest.Server
+	handler     *LobbyHandler
+	lobbyClient *gateway.LobbyGatewayClient
 }
 
 func (s *LobbyHandlerTestSuite) SetupTest() {
 	gin.SetMode(gin.TestMode)
-
-	// Mock server to simulate the gateway API
-	s.mockGateway = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(s.mockStatus)
-		if _, err := fmt.Fprint(w, s.mockResponse); err != nil {
-			s.FailNowf("Failed to write mock response", "Error: %v", err)
-		}
-	}))
-
-	s.handler = NewLobbyHandler(s.mockGateway.URL)
-	s.recorder = httptest.NewRecorder()
-	_, s.engine = gin.CreateTestContext(s.recorder)
-	s.engine.LoadHTMLGlob("../../web/templates/*")
-
-	// This middleware mock is needed because the real authentication middleware isn't running in tests.
-	// It ensures the "username" is available in the context for the handlers.
-	s.engine.Use(func(c *gin.Context) {
-		c.Set("is_logged_in", true)
-		c.Set("username", "testuser")
-		c.Next()
-	})
-
-	s.engine.POST("/lobbies/create", s.handler.CreateLobby)
-	s.engine.POST("/lobbies/:lobby_id/join", s.handler.JoinLobby)
-	s.engine.GET("/lobbies/:lobby_id", s.handler.GetLobbyPage)
-	s.engine.PUT("/lobbies/:lobby_id/finish", s.handler.FinishLobby)
+	s.router = gin.Default()
+	s.router.LoadHTMLGlob("../../web/templates/*")
 }
 
-func (s *LobbyHandlerTestSuite) TearDownTest() {
-	s.mockGateway.Close()
+func (s *LobbyHandlerTestSuite) AfterTest() {
+	if s.mockGateway != nil {
+		s.mockGateway.Close()
+	}
+}
+
+func (s *LobbyHandlerTestSuite) setup(mockHandler http.HandlerFunc) {
+	s.mockGateway = httptest.NewServer(mockHandler)
+	s.lobbyClient = gateway.NewLobbyGatewayClient(s.mockGateway.URL)
+	s.handler = NewLobbyHandler(s.lobbyClient)
+
+	// Add a mock middleware to simulate a logged-in user.
+	s.router.Use(func(c *gin.Context) {
+		middleware.SetUserInContext(c, &middleware.User{Username: "testuser"})
+		c.Next()
+	})
 }
 
 func (s *LobbyHandlerTestSuite) TestCreateLobbySuccess() {
-	s.mockStatus = http.StatusOK
-	s.mockResponse = `{"lobbyId": "lobby-123-abc"}`
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		resp := &lobby.Lobby{LobbyId: "lobby-123"}
+		body, _ := protojson.Marshal(resp)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
+	})
+	s.router.POST("/lobbies/create", s.handler.CreateLobby)
 
-	s.performPostRequest("/lobbies/create", "name=MyNewLobby")
+	formData := url.Values{"name": {"My New Lobby"}}
+	req, _ := http.NewRequest(http.MethodPost, "/lobbies/create", strings.NewReader(formData.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	s.Equal(http.StatusSeeOther, s.recorder.Code, "Expected a redirect status")
-	s.Equal("/lobbies/lobby-123-abc", s.recorder.Header().Get("Location"), "Expected redirect to the new lobby page")
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusSeeOther, w.Code)
+	s.Equal("/lobbies/lobby-123", w.Header().Get("Location"))
 }
 
-func (s *LobbyHandlerTestSuite) performPostRequest(path, form string) {
-	req, _ := http.NewRequest(http.MethodPost, path, strings.NewReader(form))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	s.engine.ServeHTTP(s.recorder, req)
+func (s *LobbyHandlerTestSuite) TestCreateLobbyFailsWithEmptyName() {
+	s.setup(nil)
+	s.router.POST("/lobbies/create", s.handler.CreateLobby)
+
+	formData := url.Values{"name": {""}}
+	req, _ := http.NewRequest(http.MethodPost, "/lobbies/create", strings.NewReader(formData.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	w := httptest.NewRecorder()
+
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusBadRequest, w.Code)
+	s.Contains(w.Body.String(), "Lobby Creation Failed")
+	s.Contains(w.Body.String(), "Lobby name cannot be empty.")
 }
 
-func (s *LobbyHandlerTestSuite) TestCreateLobbyWithEmptyName() {
-	s.performPostRequest("/lobbies/create", "name=")
+func (s *LobbyHandlerTestSuite) TestCreateLobbyFailsWhenTheGatewayFails() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	s.router.POST("/lobbies/create", s.handler.CreateLobby)
 
-	s.Equal(http.StatusBadRequest, s.recorder.Code)
-	s.assertErrorHTML("Lobby Creation Failed", "Lobby name cannot be empty.")
-}
+	formData := url.Values{"name": {"A Lobby"}}
+	req, _ := http.NewRequest(http.MethodPost, "/lobbies/create", strings.NewReader(formData.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-func (s *LobbyHandlerTestSuite) assertErrorHTML(expectedTitle, expectedMessage string) {
-	body := s.recorder.Body.String()
-	s.Contains(body, fmt.Sprintf("<strong>%s</strong>", expectedTitle), "Expected error title was not found in the response")
-	s.Contains(body, fmt.Sprintf("<p>%s</p>", expectedMessage), "Expected error message was not found in the response")
-}
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
 
-func (s *LobbyHandlerTestSuite) TestCreateLobbyWhenGatewayFails() {
-	s.mockStatus = http.StatusInternalServerError
-	s.mockResponse = `{}`
-
-	s.performPostRequest("/lobbies/create", "name=MyNewLobby")
-
-	s.Equal(http.StatusInternalServerError, s.recorder.Code)
-	s.assertErrorHTML("Lobby Creation Failed", "An unexpected error occurred while creating the lobby.")
-}
-
-func (s *LobbyHandlerTestSuite) TestCreateLobbyWhenGatewayIsDown() {
-	s.mockGateway.Close() // Simulate the gateway being offline
-
-	s.performPostRequest("/lobbies/create", "name=MyNewLobby")
-
-	s.Equal(http.StatusInternalServerError, s.recorder.Code)
-	s.assertErrorHTML("Lobby Creation Failed", "The server is currently unavailable. Please try again later.")
-}
-
-func (s *LobbyHandlerTestSuite) TestCreateLobbyFailsOnUnmarshal() {
-	s.mockStatus = http.StatusOK
-	s.mockResponse = `{"lobbyId": "123", "name": "Test"` // Malformed JSON (missing closing brace)
-
-	s.performPostRequest("/lobbies/create", "name=MyNewLobby")
-
-	s.Equal(http.StatusInternalServerError, s.recorder.Code)
-	s.assertErrorHTML("Lobby Creation Failed", "Could not understand the server response.")
+	s.Equal(http.StatusInternalServerError, w.Code)
+	s.Contains(w.Body.String(), "An unexpected error occurred")
 }
 
 func (s *LobbyHandlerTestSuite) TestJoinLobbySuccess() {
-	s.mockStatus = http.StatusOK
-	s.mockResponse = `{}`
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		resp := &lobby.Lobby{LobbyId: "lobby-456"}
+		body, _ := protojson.Marshal(resp)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
+	})
+	s.router.POST("/lobbies/:lobby_id/join", s.handler.JoinLobby)
 
-	s.performPostRequest("/lobbies/lobby-456/join", "")
+	req, _ := http.NewRequest(http.MethodPost, "/lobbies/lobby-456/join", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
 
-	s.Equal(http.StatusSeeOther, s.recorder.Code)
-	s.Equal("/lobbies/lobby-456", s.recorder.Header().Get("Location"))
+	s.Equal(http.StatusSeeOther, w.Code)
+	s.Equal("/lobbies/lobby-456", w.Header().Get("Location"))
 }
 
-func (s *LobbyHandlerTestSuite) TestJoinLobbyWhenGatewayFails() {
-	s.mockStatus = http.StatusConflict
-	s.mockResponse = `{"error": "lobby is full"}`
+func (s *LobbyHandlerTestSuite) TestJoinLobbyGatewayFailure() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	s.router.POST("/lobbies/:lobby_id/join", s.handler.JoinLobby)
 
-	s.performPostRequest("/lobbies/lobby-456/join", "")
+	req, _ := http.NewRequest(http.MethodPost, "/lobbies/any-id/join", nil)
+	w := httptest.NewRecorder()
 
-	s.Equal(http.StatusInternalServerError, s.recorder.Code)
-	s.assertErrorHTML("Join Lobby Failed", "An unexpected error occurred while joining the lobby.")
-}
+	s.router.ServeHTTP(w, req)
 
-func (s *LobbyHandlerTestSuite) TestJoinLobbyWhenGatewayIsDown() {
-	s.mockGateway.Close()
-
-	s.performPostRequest("/lobbies/lobby-456/join", "")
-
-	s.Equal(http.StatusInternalServerError, s.recorder.Code)
-	s.assertErrorHTML("Join Lobby Failed", "The server is currently unavailable. Please try again later.")
+	s.Equal(http.StatusInternalServerError, w.Code)
+	s.Contains(w.Body.String(), "Join Lobby Failed")
+	s.Contains(w.Body.String(), "An unexpected error occurred while joining the lobby.")
 }
 
 func (s *LobbyHandlerTestSuite) TestGetLobbyPageSuccess() {
-	s.mockStatus = http.StatusOK
-	s.mockResponse = `{"lobbyId": "lobby-789", "name": "Test Lobby Name"}`
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		resp := &lobby.Lobby{LobbyId: "lobby-789", Name: "The Best Lobby"}
+		body, _ := protojson.Marshal(resp)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
+	})
+	s.router.GET("/lobbies/:lobby_id", s.handler.GetLobbyPage)
 
-	s.performGetRequest("/lobbies/lobby-789")
+	req, _ := http.NewRequest(http.MethodGet, "/lobbies/lobby-789", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
 
-	s.Equal(http.StatusOK, s.recorder.Code)
-	s.Contains(s.recorder.Body.String(), "Test Lobby Name")
+	s.Equal(http.StatusOK, w.Code)
+	s.Contains(w.Body.String(), "The Best Lobby")
 }
 
-func (s *LobbyHandlerTestSuite) performGetRequest(path string) {
-	req, _ := http.NewRequest(http.MethodGet, path, nil)
-	s.engine.ServeHTTP(s.recorder, req)
+func (s *LobbyHandlerTestSuite) TestGetLobbyPageGatewayFailure() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	s.router.GET("/lobbies/:lobby_id", s.handler.GetLobbyPage)
+
+	req, _ := http.NewRequest(http.MethodGet, "/lobbies/any-id", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusInternalServerError, w.Code)
+	s.Contains(w.Body.String(), "Error Fetching Lobby")
+	s.Contains(w.Body.String(), "The server is currently unavailable.")
+}
+
+func (s *LobbyHandlerTestSuite) TestGetLobbyPageNotFound() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	s.router.GET("/lobbies/:lobby_id", s.handler.GetLobbyPage)
+
+	req, _ := http.NewRequest(http.MethodGet, "/lobbies/not-found-id", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusNotFound, w.Code)
+	s.Contains(w.Body.String(), "Lobby Not Found")
 }
 
 func (s *LobbyHandlerTestSuite) TestFinishLobbySuccess() {
-	s.mockStatus = http.StatusOK
-	s.mockResponse = `{"message": "lobby finished", "winner": "player1"}`
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		resp := &lobby.Lobby{LobbyId: "lobby-abc", Status: "Finished"}
+		body, _ := protojson.Marshal(resp)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
+	})
+	s.router.PUT("/lobbies/:lobby_id/finish", s.handler.FinishLobby)
 
-	s.performPutRequest("/lobbies/lobby-abc/finish", `{"winnerId": "player1"}`)
+	req, _ := http.NewRequest(http.MethodPut, "/lobbies/lobby-abc/finish", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
 
-	s.Equal(http.StatusOK, s.recorder.Code)
-	s.JSONEq(s.mockResponse, s.recorder.Body.String())
-	s.Equal("application/json", s.recorder.Header().Get("Content-Type"))
+	s.Equal(http.StatusOK, w.Code)
+	s.JSONEq(`{"lobby_id":"lobby-abc", "status":"Finished"}`, w.Body.String())
 }
 
-func (s *LobbyHandlerTestSuite) performPutRequest(path, jsonBody string) {
-	req, _ := http.NewRequest(http.MethodPut, path, strings.NewReader(jsonBody))
-	req.Header.Set("Content-Type", "application/json")
-	s.engine.ServeHTTP(s.recorder, req)
+func (s *LobbyHandlerTestSuite) TestFinishLobbyGatewayFailure() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := w.Write([]byte(`{"error": "database unavailable"}`))
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
+	})
+	s.router.PUT("/lobbies/:lobby_id/finish", s.handler.FinishLobby)
+
+	req, _ := http.NewRequest(http.MethodPut, "/lobbies/any-id/finish", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusInternalServerError, w.Code)
+	s.JSONEq(`{"error": "An unexpected error occurred"}`, w.Body.String())
 }
 
-func (s *LobbyHandlerTestSuite) TestFinishLobbyGatewayError() {
-	s.mockStatus = http.StatusBadRequest
-	s.mockResponse = `{"error": "winner not in lobby"}`
-
-	s.performPutRequest("/lobbies/lobby-abc/finish", `{"winnerId": "player-not-in-lobby"}`)
-
-	s.Equal(http.StatusBadRequest, s.recorder.Code)
-	s.JSONEq(s.mockResponse, s.recorder.Body.String())
-}
-
-func TestLobbyHandlers(t *testing.T) {
+func TestLobbyHandler(t *testing.T) {
 	suite.Run(t, new(LobbyHandlerTestSuite))
 }

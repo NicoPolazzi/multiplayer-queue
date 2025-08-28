@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/models"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// AuthService implements the gRPC auth service server for user authentication and registration.
 type AuthService struct {
 	auth.UnimplementedAuthServiceServer
 	userRepository usrrepo.UserRepository
@@ -27,7 +29,13 @@ func NewAuthService(repo usrrepo.UserRepository, manager token.TokenManager) aut
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, req *auth.RegisterUserRequest) (*auth.User, error) {
-	if _, err := s.userRepository.FindByUsername(req.GetUsername()); err == nil {
+	username := req.GetUsername()
+
+	if strings.TrimSpace(username) == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "username cannot be empty")
+	}
+
+	if _, err := s.userRepository.FindByUsername(username); err == nil {
 		return nil, status.Errorf(codes.AlreadyExists, "username is already taken")
 	}
 
@@ -37,7 +45,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, req *auth.RegisterUserRe
 	}
 
 	userModel := &models.User{
-		Username: req.GetUsername(),
+		Username: username,
 		Password: string(hashedPassword),
 	}
 
@@ -45,10 +53,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, req *auth.RegisterUserRe
 		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
 	}
 
-	return &auth.User{
-		Id:       uint32(userModel.ID),
-		Username: userModel.Username,
-	}, nil
+	return toProtoUser(userModel), nil
 }
 
 // It checks for the credentials and returns the computed JWT to the caller
@@ -56,7 +61,7 @@ func (s *AuthService) LoginUser(ctx context.Context, req *auth.LoginUserRequest)
 	user, err := s.userRepository.FindByUsername(req.GetUsername())
 	if err != nil {
 		if errors.Is(err, usrrepo.ErrUserNotFound) {
-			return nil, status.Errorf(codes.NotFound, "invalid credentials")
+			return nil, status.Errorf(codes.Unauthenticated, "invalid credentials")
 		}
 		return nil, status.Errorf(codes.Internal, "failed to retrieve user: %v", err)
 	}
@@ -73,9 +78,13 @@ func (s *AuthService) LoginUser(ctx context.Context, req *auth.LoginUserRequest)
 
 	return &auth.LoginUserResponse{
 		Token: token,
-		User: &auth.User{
-			Id:       uint32(user.ID),
-			Username: user.Username,
-		},
+		User:  toProtoUser(user),
 	}, nil
+}
+
+func toProtoUser(user *models.User) *auth.User {
+	return &auth.User{
+		Id:       uint32(user.ID),
+		Username: user.Username,
+	}
 }

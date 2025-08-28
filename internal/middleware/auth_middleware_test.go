@@ -16,7 +16,8 @@ type MockTokenManager struct {
 }
 
 func (m *MockTokenManager) Create(username string) (string, error) {
-	return "", nil
+	args := m.Called(username)
+	return args.String(0), args.Error(1)
 }
 
 func (m *MockTokenManager) Validate(tokenString string) (string, error) {
@@ -28,66 +29,112 @@ type AuthMiddlewareTestSuite struct {
 	suite.Suite
 	tokenManager   *MockTokenManager
 	authMiddleware *AuthMiddleware
-	recorder       *httptest.ResponseRecorder
-	context        *gin.Context
 }
 
 func (s *AuthMiddlewareTestSuite) SetupTest() {
 	gin.SetMode(gin.TestMode)
 	s.tokenManager = new(MockTokenManager)
 	s.authMiddleware = NewAuthMiddleware(s.tokenManager)
-	s.recorder = httptest.NewRecorder()
-	s.context, _ = gin.CreateTestContext(s.recorder)
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsValid() {
-	validToken := "valid.token.string"
-	expectedUsername := "testuser"
-	s.tokenManager.On("Validate", validToken).Return(expectedUsername, nil)
+// Helper to create a test context and recorder
+func (s *AuthMiddlewareTestSuite) createTestContext(req *http.Request) (*httptest.ResponseRecorder, *gin.Context) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	return w, ctx
+}
 
-	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-	s.context.Request.AddCookie(&http.Cookie{
-		Name:  "token",
-		Value: validToken,
-	})
+func (s *AuthMiddlewareTestSuite) TestCheckUserWhenTokenIsValid() {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "token", Value: "valid-token"})
+	_, ctx := s.createTestContext(req)
 
+	s.tokenManager.On("Validate", "valid-token").Return("testuser", nil)
 	handler := s.authMiddleware.CheckUser()
-	handler(s.context)
 
+	handler(ctx)
+
+	user, ok := UserFromContext(ctx)
+	s.True(ok, "User should be found in context")
+	s.NotNil(user)
+	s.Equal("testuser", user.Username)
+	s.False(ctx.IsAborted())
 	s.tokenManager.AssertExpectations(s.T())
-	username, _ := s.context.Get("username")
-	isLoggedIn, _ := s.context.Get("is_logged_in")
-	s.True(isLoggedIn.(bool))
-	s.Equal(expectedUsername, username)
-	s.False(s.context.IsAborted())
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenCookiesIsNotSet() {
-	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+func (s *AuthMiddlewareTestSuite) TestCheckUserWhenCookieIsNotSet() {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	_, ctx := s.createTestContext(req)
 	handler := s.authMiddleware.CheckUser()
-	handler(s.context)
-	username, _ := s.context.Get("username")
-	isLoggedIn, _ := s.context.Get("is_logged_in")
-	s.Empty(username)
-	s.Empty(isLoggedIn)
+
+	handler(ctx)
+	_, ok := UserFromContext(ctx)
+	s.False(ok, "User should not be found in context")
+	s.False(ctx.IsAborted())
 }
 
-func (s *AuthMiddlewareTestSuite) TestAuthMiddlewareWhenTokenIsInvalid() {
-	invalidToken := "invalid.token.string"
-	s.tokenManager.On("Validate", invalidToken).Return("", token.ErrInvalidToken)
-	s.context.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-	s.context.Request.AddCookie(&http.Cookie{
-		Name:  "token",
-		Value: invalidToken,
-	})
+func (s *AuthMiddlewareTestSuite) TestCheckUserWhenTokenIsInvalid() {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "token", Value: "invalid-token"})
+	_, ctx := s.createTestContext(req)
 
+	s.tokenManager.On("Validate", "invalid-token").Return("", token.ErrInvalidToken)
 	handler := s.authMiddleware.CheckUser()
-	handler(s.context)
+
+	handler(ctx)
+
+	_, ok := UserFromContext(ctx)
+	s.False(ok, "User should not be found in context")
+	s.False(ctx.IsAborted())
 	s.tokenManager.AssertExpectations(s.T())
-	username, _ := s.context.Get("username")
-	isLoggedIn, _ := s.context.Get("is_logged_in")
-	s.Empty(username)
-	s.False(isLoggedIn.(bool))
+}
+
+func (s *AuthMiddlewareTestSuite) TestEnsureLoggedInSuccess() {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	w, ctx := s.createTestContext(req)
+	SetUserInContext(ctx, &User{Username: "testuser"})
+	handler := EnsureLoggedIn()
+
+	handler(ctx)
+
+	s.False(ctx.IsAborted())
+	s.Equal(http.StatusOK, w.Code, "Expected no redirect")
+}
+
+func (s *AuthMiddlewareTestSuite) TestEnsureLoggedInRedirectsWhenNotLoggedIn() {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	w, ctx := s.createTestContext(req)
+	handler := EnsureLoggedIn()
+
+	handler(ctx)
+
+	s.True(ctx.IsAborted())
+	s.Equal(http.StatusSeeOther, w.Code)
+	s.Equal("/user/login", w.Header().Get("Location"))
+}
+
+func (s *AuthMiddlewareTestSuite) TestEnsureNotLoggedInSuccess() {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	w, ctx := s.createTestContext(req)
+	handler := EnsureNotLoggedIn()
+
+	handler(ctx)
+	s.False(ctx.IsAborted())
+	s.Equal(http.StatusOK, w.Code)
+}
+
+func (s *AuthMiddlewareTestSuite) TestEnsureNotLoggedInRedirectsWhenLoggedIn() {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	w, ctx := s.createTestContext(req)
+	SetUserInContext(ctx, &User{Username: "testuser"})
+	handler := EnsureNotLoggedIn()
+
+	handler(ctx)
+
+	s.True(ctx.IsAborted())
+	s.Equal(http.StatusSeeOther, w.Code)
+	s.Equal("/", w.Header().Get("Location"))
 }
 
 func TestAuthMiddleware(t *testing.T) {

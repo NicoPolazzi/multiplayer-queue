@@ -17,7 +17,6 @@ func NewAuthMiddleware(tokenManager token.TokenManager) *AuthMiddleware {
 
 func (m *AuthMiddleware) CheckUser() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		ctx.Set("is_logged_in", false)
 		tokenString, err := ctx.Cookie("token")
 		if err != nil {
 			ctx.Next()
@@ -25,21 +24,19 @@ func (m *AuthMiddleware) CheckUser() gin.HandlerFunc {
 		}
 
 		username, err := m.tokenManager.Validate(tokenString)
-		if err == token.ErrInvalidToken {
-			ctx.Set("is_logged_in", false)
+		if err != nil {
 			ctx.Next()
 			return
 		}
 
-		ctx.Set("is_logged_in", true)
-		ctx.Set("username", username)
+		SetUserInContext(ctx, &User{Username: username})
 		ctx.Next()
 	}
 }
 
 func EnsureLoggedIn() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if is, exists := c.Get("is_logged_in"); !exists || !is.(bool) {
+		if _, ok := UserFromContext(c); !ok {
 			c.Redirect(http.StatusSeeOther, "/user/login")
 			c.Abort()
 			return
@@ -50,7 +47,7 @@ func EnsureLoggedIn() gin.HandlerFunc {
 
 func EnsureNotLoggedIn() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if is, exists := c.Get("is_logged_in"); exists && is.(bool) {
+		if _, ok := UserFromContext(c); ok {
 			c.Redirect(http.StatusSeeOther, "/")
 			c.Abort()
 			return

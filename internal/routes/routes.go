@@ -7,18 +7,15 @@ import (
 )
 
 type RoutesManager struct {
-	userHandler     *handlers.UserHandler
-	lobbyHandler    *handlers.LobbyHandler
-	authMiddleware  *middleware.AuthMiddleware
-	lobbyMiddleware *middleware.LobbyMiddleware
+	userHandler    *handlers.UserHandler
+	lobbyHandler   *handlers.LobbyHandler
+	authMiddleware *middleware.AuthMiddleware
 }
 
 func NewRoutes(userHandler *handlers.UserHandler,
 	lobbyHandler *handlers.LobbyHandler,
-	authMiddleware *middleware.AuthMiddleware,
-	lobbyMiddleware *middleware.LobbyMiddleware) *RoutesManager {
-	return &RoutesManager{userHandler: userHandler, lobbyHandler: lobbyHandler, authMiddleware: authMiddleware,
-		lobbyMiddleware: lobbyMiddleware}
+	authMiddleware *middleware.AuthMiddleware) *RoutesManager {
+	return &RoutesManager{userHandler: userHandler, lobbyHandler: lobbyHandler, authMiddleware: authMiddleware}
 }
 
 func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
@@ -47,5 +44,5 @@ func (m *RoutesManager) InitializeRoutes(router *gin.Engine) {
 		protected.GET("/user/logout", m.userHandler.PerformLogout)
 	}
 
-	router.GET("/", m.lobbyMiddleware.LoadLobbies(), m.userHandler.ShowIndexPage)
+	router.GET("/", m.userHandler.ShowIndexPage)
 }

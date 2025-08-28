@@ -1,5 +1,12 @@
 {{ template "header.html" .}}
 
+{{ if .ErrorTitle }}
+<div class="alert alert-danger">
+    <strong>{{ .ErrorTitle }}</strong>
+    <p>{{ .ErrorMessage }}</p>
+</div>
+{{ end }}
+
 <div class="container mt-5">
     <h1>Lobby: {{ .lobby.Name }}</h1>
     <div class="card">
@@ -64,7 +71,7 @@
 
         if (playerCount === '2' && initialStatus === 'IN_PROGRESS') {
             timerContainer.style.display = 'block';
-            let timeLeft = 30;
+            let timeLeft = 10; // seconds
 
             const interval = setInterval(() => {
                 timeLeft--;

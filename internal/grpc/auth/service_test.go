@@ -76,6 +76,18 @@ func (s *AuthServerTestSuite) TestRegisterUserSuccess() {
 	s.usrRepo.AssertExpectations(s.T())
 }
 
+func (s *AuthServerTestSuite) TestRegisterUserWhenUsernameIsEmpty() {
+	req := &pb.RegisterUserRequest{Username: "  ", Password: "password123"}
+	resp, err := s.server.RegisterUser(context.Background(), req)
+	s.Empty(resp)
+	st, ok := status.FromError(err)
+	s.True(ok)
+	s.Equal(codes.InvalidArgument, st.Code())
+	s.Equal(st.Message(), "username cannot be empty")
+	s.usrRepo.AssertNotCalled(s.T(), "FindByUsername", mock.Anything)
+	s.usrRepo.AssertNotCalled(s.T(), "Create", mock.Anything)
+}
+
 func (s *AuthServerTestSuite) TestRegisterUserWhenUsernameIsTaken() {
 	req := &pb.RegisterUserRequest{Username: "existinguser", Password: "password123"}
 	mockUser := &models.User{Username: "existinguser"}
@@ -86,6 +98,7 @@ func (s *AuthServerTestSuite) TestRegisterUserWhenUsernameIsTaken() {
 	st, ok := status.FromError(err)
 	s.True(ok)
 	s.Equal(codes.AlreadyExists, st.Code())
+	s.Equal(st.Message(), "username is already taken")
 	s.usrRepo.AssertExpectations(s.T())
 	s.usrRepo.AssertNotCalled(s.T(), "Create", mock.Anything)
 }
@@ -151,7 +164,7 @@ func (s *AuthServerTestSuite) TestLoginUserWhenUserNotFound() {
 	s.Empty(resp)
 	st, ok := status.FromError(err)
 	s.True(ok)
-	s.Equal(codes.NotFound, st.Code())
+	s.Equal(codes.Unauthenticated, st.Code())
 	s.Equal(st.Message(), "invalid credentials")
 	s.jwtManager.AssertNotCalled(s.T(), "Create", mock.Anything)
 }

@@ -18,7 +18,6 @@ func TestInitializeRoutes(t *testing.T) {
 		&handlers.UserHandler{},
 		&handlers.LobbyHandler{},
 		&middleware.AuthMiddleware{},
-		&middleware.LobbyMiddleware{},
 	)
 	manager.InitializeRoutes(router)
 
