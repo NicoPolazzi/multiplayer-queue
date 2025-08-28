@@ -11,8 +11,11 @@ import (
 	lobbyrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/lobby"
 	usrrepo "github.com/NicoPolazzi/multiplayer-queue/internal/repository/user"
 	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
+// LobbyService implements the gRPC lobby service server for managing game lobbies.
 type LobbyService struct {
 	lobby.UnimplementedLobbyServiceServer
 	lobbyRepo lobbyrepo.LobbyRepository
@@ -27,24 +30,26 @@ func NewLobbyService(lobbyRepo lobbyrepo.LobbyRepository, userRepo usrrepo.UserR
 }
 
 func (s *LobbyService) CreateLobby(ctx context.Context, req *lobby.CreateLobbyRequest) (*lobby.Lobby, error) {
-	creator, err := s.userRepo.FindByUsername(req.GetUsername())
-	if err != nil {
-		return nil, err
+	lobbyName := req.GetName()
+
+	if strings.TrimSpace(lobbyName) == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "lobby name cannot be empty")
 	}
 
-	if strings.TrimSpace(req.GetName()) == "" {
-		return nil, errors.New("lobby name cannot be empty")
+	creator, err := s.userRepo.FindByUsername(req.GetUsername())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Invalid creator: %v", err)
 	}
 
 	newLobby := &models.Lobby{
 		LobbyID: uuid.New().String(),
-		Name:    req.GetName(),
+		Name:    lobbyName,
 		Players: []models.User{*creator},
 		Status:  models.LobbyStatusWaiting,
 	}
 
 	if err := s.lobbyRepo.Create(newLobby); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Lopbby DB error: %v", err)
 	}
 
 	return toProtoLobby(newLobby), nil
@@ -53,12 +58,12 @@ func (s *LobbyService) CreateLobby(ctx context.Context, req *lobby.CreateLobbyRe
 func (s *LobbyService) JoinLobby(ctx context.Context, req *lobby.JoinLobbyRequest) (*lobby.Lobby, error) {
 	player, err := s.userRepo.FindByUsername(req.GetUsername())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Invalid player: %v", err)
 	}
 
 	lobbyToJoin, err := s.lobbyRepo.FindByID(req.GetLobbyId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Lobby not found: %v", err)
 	}
 
 	if len(lobbyToJoin.Players) >= 2 {
@@ -66,11 +71,11 @@ func (s *LobbyService) JoinLobby(ctx context.Context, req *lobby.JoinLobbyReques
 	}
 
 	if err := s.lobbyRepo.AddPlayer(lobbyToJoin, player); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Can not add the player: %v", err)
 	}
 
 	if err := s.lobbyRepo.UpdateStatus(lobbyToJoin, models.LobbyStatusInProgress); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Lobby DB error: %v", err)
 	}
 
 	lobbyToJoin.Players = append(lobbyToJoin.Players, *player)
@@ -88,11 +93,11 @@ func (s *LobbyService) FinishGame(ctx context.Context, req *lobby.FinishGameRequ
 	winner := gameLobby.Players[winnerIndex]
 
 	if err := s.lobbyRepo.UpdateWinner(gameLobby, winner.ID); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Lobby DB error: %v", err)
 	}
 
 	if err := s.lobbyRepo.UpdateStatus(gameLobby, models.LobbyStatusFinished); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Lobby DB error: %v", err)
 	}
 
 	gameLobby.Winner = &winner
@@ -103,7 +108,7 @@ func (s *LobbyService) FinishGame(ctx context.Context, req *lobby.FinishGameRequ
 func (s *LobbyService) GetLobby(ctx context.Context, req *lobby.GetLobbyRequest) (*lobby.Lobby, error) {
 	foundLobby, err := s.lobbyRepo.FindByID(req.GetLobbyId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "Invalid Lobby ID: %v", err)
 	}
 	return toProtoLobby(foundLobby), nil
 }

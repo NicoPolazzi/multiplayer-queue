@@ -5,6 +5,7 @@ import (
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/gateway"
 	grpcauth "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/auth"
 	grpclobby "github.com/NicoPolazzi/multiplayer-queue/internal/grpc/lobby"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/handlers"
@@ -31,8 +32,9 @@ func BuildContainer(db *gorm.DB, cfg *Config) *AppContainer {
 	tokenManager := token.NewJWTTokenManager([]byte(cfg.JWTSecret))
 
 	gatewayURL := fmt.Sprintf("http://%s:%s", cfg.Host, cfg.GRPCGatewayPort)
+	lobbyClient := gateway.NewLobbyGatewayClient(gatewayURL)
 	userHandler := handlers.NewUserHandler(gatewayURL)
-	lobbyHandler := handlers.NewLobbyHandler(gatewayURL)
+	lobbyHandler := handlers.NewLobbyHandler(lobbyClient)
 	lobbyMiddleware := middleware.NewLobbyMiddleware(gatewayURL)
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
 

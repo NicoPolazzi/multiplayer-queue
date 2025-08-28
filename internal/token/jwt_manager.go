@@ -14,6 +14,7 @@ type claims struct {
 	jwt.RegisteredClaims
 }
 
+// jwtTokenManager object is used to create and validate JWT tokens.
 type jwtTokenManager struct {
 	secretKey []byte
 }
