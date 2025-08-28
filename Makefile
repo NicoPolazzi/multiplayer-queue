@@ -6,12 +6,15 @@ check-quality:
 	make fmt
 
 lint:
+	@echo "Running linter..."
 	golangci-lint run
 
 fmt:
+	@echo "Running formatter..."
 	go fmt ./...
 
 test:
+	@echo "Running tests..."
 	go test -race -covermode atomic -coverprofile=coverage.txt $(TESTFOLDER)
 
 all:

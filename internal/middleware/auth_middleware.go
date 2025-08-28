@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/internal/token"
@@ -26,9 +25,6 @@ func (m *AuthMiddleware) CheckUser() gin.HandlerFunc {
 
 		username, err := m.tokenManager.Validate(tokenString)
 		if err != nil {
-			if err != token.ErrInvalidToken {
-				log.Printf("Error validating token: %v", err)
-			}
 			ctx.Next()
 			return
 		}

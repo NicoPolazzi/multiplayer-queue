@@ -100,6 +100,7 @@ func (s *LobbyService) FinishGame(ctx context.Context, req *lobby.FinishGameRequ
 	}
 
 	gameLobby.Winner = &winner
+	gameLobby.WinnerID = &winner.ID
 	gameLobby.Status = models.LobbyStatusFinished
 	return toProtoLobby(gameLobby), nil
 }
