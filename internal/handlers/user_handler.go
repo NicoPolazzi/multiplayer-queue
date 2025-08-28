@@ -1,15 +1,12 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"log"
+	"errors"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/gateway"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -18,11 +15,11 @@ const (
 )
 
 type UserHandler struct {
-	gatewayBaseURL string
+	authClient *gateway.AuthGatewayClient
 }
 
-func NewUserHandler(gatewayBaseURL string) *UserHandler {
-	return &UserHandler{gatewayBaseURL: gatewayBaseURL}
+func NewUserHandler(client *gateway.AuthGatewayClient) *UserHandler {
+	return &UserHandler{authClient: client}
 }
 
 func (h *UserHandler) ShowIndexPage(c *gin.Context) {
@@ -42,43 +39,25 @@ func (h *UserHandler) ShowRegisterPage(c *gin.Context) {
 }
 
 func (h *UserHandler) PerformLogin(c *gin.Context) {
-	username := c.PostForm("username")
-	password := c.PostForm("password")
-
 	loginReq := &auth.LoginUserRequest{
-		Username: username,
-		Password: password,
+		Username: c.PostForm("username"),
+		Password: c.PostForm("password"),
 	}
-	reqBody, _ := protojson.Marshal(loginReq)
 
-	resp, err := http.Post(h.gatewayBaseURL+"/api/v1/auth/login", "application/json", bytes.NewBuffer(reqBody))
+	loginResponse, err := h.authClient.Login(c.Request.Context(), loginReq)
 	if err != nil {
+		var apiErr *gateway.APIError
+		if errors.As(err, &apiErr) && (apiErr.StatusCode == http.StatusUnauthorized || apiErr.StatusCode == http.StatusNotFound) {
+			c.HTML(apiErr.StatusCode, LoginPageFilename, gin.H{
+				"ErrorTitle":   "Login Failed",
+				"ErrorMessage": "Invalid username or password.",
+			})
+			return
+		}
+
 		c.HTML(http.StatusInternalServerError, LoginPageFilename, gin.H{
 			"ErrorTitle":   "Service Error",
-			"ErrorMessage": "Could not contact the authentication service.",
-		})
-		return
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Error closing response body: %v", err)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		c.HTML(resp.StatusCode, LoginPageFilename, gin.H{
-			"ErrorTitle":   "Login Failed",
-			"ErrorMessage": "Invalid username or password.",
-		})
-		return
-	}
-
-	var loginResponse auth.LoginUserResponse
-	body, _ := io.ReadAll(resp.Body)
-	if err := json.Unmarshal(body, &loginResponse); err != nil {
-		c.HTML(http.StatusInternalServerError, LoginPageFilename, gin.H{
-			"ErrorTitle":   "Server Error",
-			"ErrorMessage": "Failed to process the login response.",
+			"ErrorMessage": "The authentication service is currently unavailable.",
 		})
 		return
 	}
@@ -88,48 +67,29 @@ func (h *UserHandler) PerformLogin(c *gin.Context) {
 }
 
 func (h *UserHandler) PerformRegistration(c *gin.Context) {
-	username := c.PostForm("username")
-	password := c.PostForm("password")
-
 	regReq := &auth.RegisterUserRequest{
-		Username: username,
-		Password: password,
+		Username: c.PostForm("username"),
+		Password: c.PostForm("password"),
 	}
-	reqBody, _ := protojson.Marshal(regReq)
 
-	resp, err := http.Post(h.gatewayBaseURL+"/api/v1/auth/register", "application/json", bytes.NewBuffer(reqBody))
+	err := h.authClient.Register(c.Request.Context(), regReq)
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, RegisterPageFilename, gin.H{
-			"ErrorTitle":   "Service Error",
-			"ErrorMessage": "Could not contact the auth service.",
-		})
-		return
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Error closing response body: %v", err)
+		var apiErr *gateway.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict {
+			c.HTML(apiErr.StatusCode, RegisterPageFilename, gin.H{
+				"ErrorTitle":   "Registration Failed",
+				"ErrorMessage": "That username is already taken. Please choose another one.",
+			})
+			return
 		}
-	}()
-
-	// On successful registration, gateway returns 200 OK.
-	if resp.StatusCode == http.StatusOK {
-		c.Redirect(http.StatusSeeOther, "/user/login")
-		return
-	}
-
-	if resp.StatusCode == http.StatusConflict {
-		c.HTML(resp.StatusCode, RegisterPageFilename, gin.H{
+		c.HTML(http.StatusInternalServerError, RegisterPageFilename, gin.H{
 			"ErrorTitle":   "Registration Failed",
-			"ErrorMessage": "That username is already taken. Please choose another one.",
+			"ErrorMessage": "An unexpected error occurred. Please try again.",
 		})
 		return
 	}
 
-	// Handle all other errors generically.
-	c.HTML(resp.StatusCode, RegisterPageFilename, gin.H{
-		"ErrorTitle":   "Registration Failed",
-		"ErrorMessage": "An unexpected error occurred. Please try again.",
-	})
+	c.Redirect(http.StatusSeeOther, "/user/login")
 }
 
 func (h *UserHandler) PerformLogout(c *gin.Context) {
