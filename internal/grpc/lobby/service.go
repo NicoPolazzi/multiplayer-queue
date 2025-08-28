@@ -49,7 +49,7 @@ func (s *LobbyService) CreateLobby(ctx context.Context, req *lobby.CreateLobbyRe
 	}
 
 	if err := s.lobbyRepo.Create(newLobby); err != nil {
-		return nil, status.Errorf(codes.Internal, "Lopbby DB error: %v", err)
+		return nil, status.Errorf(codes.Internal, "Lobby DB error: %v", err)
 	}
 
 	return toProtoLobby(newLobby), nil

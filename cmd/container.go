@@ -34,12 +34,11 @@ func BuildContainer(db *gorm.DB, cfg *Config) *AppContainer {
 	gatewayURL := fmt.Sprintf("http://%s:%s", cfg.Host, cfg.GRPCGatewayPort)
 	lobbyClient := gateway.NewLobbyGatewayClient(gatewayURL)
 	authClient := gateway.NewAuthGatewayClient(gatewayURL)
-	userHandler := handlers.NewUserHandler(authClient)
+	userHandler := handlers.NewUserHandler(authClient, lobbyClient)
 	lobbyHandler := handlers.NewLobbyHandler(lobbyClient)
-	lobbyMiddleware := middleware.NewLobbyMiddleware(gatewayURL)
 	authMiddleware := middleware.NewAuthMiddleware(tokenManager)
 
-	routesManager := routes.NewRoutes(userHandler, lobbyHandler, authMiddleware, lobbyMiddleware)
+	routesManager := routes.NewRoutes(userHandler, lobbyHandler, authMiddleware)
 
 	lobbyService := grpclobby.NewLobbyService(lobbyRepo, userRepo)
 	authService := grpcauth.NewAuthService(userRepo, tokenManager)

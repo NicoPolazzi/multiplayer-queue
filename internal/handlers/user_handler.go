@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
+	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/gateway"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,20 +17,41 @@ const (
 	RegisterPageFilename = "register.html"
 )
 
+// UserHandler is responsible of handling user HTML pages and cookies.
+// It delegates the login and register business logic to the gateway clients.
 type UserHandler struct {
-	authClient *gateway.AuthGatewayClient
+	lobbyClient *gateway.LobbyGatewayClient
+	authClient  *gateway.AuthGatewayClient
 }
 
-func NewUserHandler(client *gateway.AuthGatewayClient) *UserHandler {
-	return &UserHandler{authClient: client}
+func NewUserHandler(authClient *gateway.AuthGatewayClient, lobbyClient *gateway.LobbyGatewayClient) *UserHandler {
+	return &UserHandler{
+		authClient:  authClient,
+		lobbyClient: lobbyClient,
+	}
 }
 
 func (h *UserHandler) ShowIndexPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "index.html", gin.H{
-		"is_logged_in": c.GetBool("is_logged_in"),
-		"lobbies":      c.MustGet("lobbies"),
-		"username":     c.GetString("username"),
-	})
+	data := gin.H{
+		"lobbies":      []*lobby.Lobby{},
+		"is_logged_in": false,
+	}
+
+	if user, ok := middleware.UserFromContext(c); ok {
+		data["is_logged_in"] = true
+		data["username"] = user.Username
+
+		lobbies, err := h.lobbyClient.ListAvailableLobbies(c.Request.Context())
+		if err != nil {
+			log.Printf("UserHandler: Could not load lobbies: %v", err)
+			data["ErrorTitle"] = "Lobby Service Error"
+			data["ErrorMessage"] = "Could not retrieve the list of available lobbies."
+		} else {
+			data["lobbies"] = lobbies
+		}
+	}
+
+	c.HTML(http.StatusOK, "index.html", data)
 }
 
 func (h *UserHandler) ShowLoginPage(c *gin.Context) {

@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/gateway"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,30 +25,32 @@ func NewLobbyHandler(client *gateway.LobbyGatewayClient) *LobbyHandler {
 }
 
 func (h *LobbyHandler) CreateLobby(c *gin.Context) {
-	username := c.GetString("username")
+	// Is ok to not check the existence of the user because this handler is protected with the authMiddleware
+	user, _ := middleware.UserFromContext(c)
+
 	lobbyName := c.PostForm("name")
 	if lobbyName == "" {
 		c.HTML(http.StatusBadRequest, indexPageFilename, gin.H{
 			"ErrorTitle":   "Lobby Creation Failed",
 			"ErrorMessage": "Lobby name cannot be empty.",
 			"is_logged_in": true,
-			"username":     username,
+			"username":     user.Username,
 		})
 		return
 	}
 
 	createReq := &lobby.CreateLobbyRequest{
 		Name:     lobbyName,
-		Username: username,
+		Username: user.Username,
 	}
 
 	newLobby, err := h.lobbyClient.CreateLobby(c.Request.Context(), createReq)
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, indexPageFilename, gin.H{
 			"ErrorTitle":   "Lobby Creation Failed",
-			"ErrorMessage": "An unexpected error occurred while creating the lobby.",
+			"ErrorMessage": fmt.Sprintf("An unexpected error occurred while creating the lobby: %v.", err),
 			"is_logged_in": true,
-			"username":     username,
+			"username":     user.Username,
 		})
 		return
 	}
@@ -55,12 +59,12 @@ func (h *LobbyHandler) CreateLobby(c *gin.Context) {
 }
 
 func (h *LobbyHandler) JoinLobby(c *gin.Context) {
-	username := c.GetString("username")
+	user, _ := middleware.UserFromContext(c)
 	lobbyID := c.Param("lobby_id")
 
 	joinReq := &lobby.JoinLobbyRequest{
 		LobbyId:  lobbyID,
-		Username: username,
+		Username: user.Username,
 	}
 
 	err := h.lobbyClient.JoinLobby(c.Request.Context(), joinReq)
@@ -69,7 +73,7 @@ func (h *LobbyHandler) JoinLobby(c *gin.Context) {
 			"ErrorTitle":   "Join Lobby Failed",
 			"ErrorMessage": "An unexpected error occurred while joining the lobby.",
 			"is_logged_in": true,
-			"username":     username,
+			"username":     user.Username,
 		})
 		return
 	}
@@ -78,6 +82,7 @@ func (h *LobbyHandler) JoinLobby(c *gin.Context) {
 }
 
 func (h *LobbyHandler) GetLobbyPage(c *gin.Context) {
+	user, _ := middleware.UserFromContext(c)
 	lobbyID := c.Param("lobby_id")
 
 	lobbyData, err := h.lobbyClient.GetLobby(c.Request.Context(), lobbyID)
@@ -101,7 +106,7 @@ func (h *LobbyHandler) GetLobbyPage(c *gin.Context) {
 	c.HTML(http.StatusOK, lobbyPageFilename, gin.H{
 		"lobby":        lobbyData,
 		"is_logged_in": c.GetBool("is_logged_in"),
-		"username":     c.GetString("username"),
+		"username":     user.Username,
 	})
 }
 
