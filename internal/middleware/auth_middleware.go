@@ -33,7 +33,7 @@ func (m *AuthMiddleware) CheckUser() gin.HandlerFunc {
 			return
 		}
 
-		setUserInContext(ctx, &User{Username: username})
+		SetUserInContext(ctx, &User{Username: username})
 		ctx.Next()
 	}
 }

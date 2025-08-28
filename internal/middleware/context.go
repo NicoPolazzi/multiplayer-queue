@@ -10,7 +10,7 @@ type User struct {
 	Username string
 }
 
-func setUserInContext(c *gin.Context, user *User) {
+func SetUserInContext(c *gin.Context, user *User) {
 	c.Set(string(userKey), user)
 }
 

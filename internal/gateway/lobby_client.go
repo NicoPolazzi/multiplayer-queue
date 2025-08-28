@@ -57,7 +57,7 @@ func (c *LobbyGatewayClient) FinishLobby(ctx context.Context, lobbyID string) (*
 
 func (c *LobbyGatewayClient) ListAvailableLobbies(ctx context.Context) ([]*lobby.Lobby, error) {
 	var lobbyListResponse lobby.ListAvailableLobbiesResponse
-	err := c.baseClient.doProtoRequest(ctx, http.MethodGet, "/api/v1/lobbies/available", nil, &lobbyListResponse)
+	err := c.doProtoRequest(ctx, http.MethodGet, "/api/v1/lobbies/available", nil, &lobbyListResponse)
 	if err != nil {
 		return nil, err
 	}
