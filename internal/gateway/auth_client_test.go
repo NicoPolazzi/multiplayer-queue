@@ -21,7 +21,10 @@ func TestAuthGatewayClientLogin(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			body, _ := protojson.Marshal(mockResponse)
-			w.Write(body)
+			_, err := w.Write(body)
+			if err != nil {
+				t.Fatalf("Failed to write response: %v", err)
+			}
 		}))
 		defer server.Close()
 

@@ -52,7 +52,10 @@ func (s *LobbyHandlerTestSuite) TestCreateLobbySuccess() {
 		w.WriteHeader(http.StatusOK)
 		resp := &lobby.Lobby{LobbyId: "lobby-123"}
 		body, _ := protojson.Marshal(resp)
-		w.Write(body)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
 	})
 	s.router.POST("/lobbies/create", s.handler.CreateLobby)
 
@@ -106,7 +109,10 @@ func (s *LobbyHandlerTestSuite) TestJoinLobbySuccess() {
 		w.WriteHeader(http.StatusOK)
 		resp := &lobby.Lobby{LobbyId: "lobby-456"}
 		body, _ := protojson.Marshal(resp)
-		w.Write(body)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
 	})
 	s.router.POST("/lobbies/:lobby_id/join", s.handler.JoinLobby)
 
@@ -139,7 +145,10 @@ func (s *LobbyHandlerTestSuite) TestGetLobbyPageSuccess() {
 		w.WriteHeader(http.StatusOK)
 		resp := &lobby.Lobby{LobbyId: "lobby-789", Name: "The Best Lobby"}
 		body, _ := protojson.Marshal(resp)
-		w.Write(body)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
 	})
 	s.router.GET("/lobbies/:lobby_id", s.handler.GetLobbyPage)
 
@@ -185,7 +194,10 @@ func (s *LobbyHandlerTestSuite) TestFinishLobbySuccess() {
 		w.WriteHeader(http.StatusOK)
 		resp := &lobby.Lobby{LobbyId: "lobby-abc", Status: "Finished"}
 		body, _ := protojson.Marshal(resp)
-		w.Write(body)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
 	})
 	s.router.PUT("/lobbies/:lobby_id/finish", s.handler.FinishLobby)
 
@@ -201,7 +213,10 @@ func (s *LobbyHandlerTestSuite) TestFinishLobbyGatewayFailure() {
 	s.setup(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error": "database unavailable"}`))
+		_, err := w.Write([]byte(`{"error": "database unavailable"}`))
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
 	})
 	s.router.PUT("/lobbies/:lobby_id/finish", s.handler.FinishLobby)
 

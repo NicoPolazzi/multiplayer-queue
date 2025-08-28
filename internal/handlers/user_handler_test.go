@@ -79,7 +79,10 @@ func (s *UserHandlerTestSuite) TestShowIndexPageAsLoggedInUser() {
 		w.WriteHeader(http.StatusOK)
 		resp := &lobby.ListAvailableLobbiesResponse{Lobbies: []*lobby.Lobby{{Name: "Fun Lobby"}}}
 		body, _ := protojson.Marshal(resp)
-		w.Write(body)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
 	})
 	s.router.GET("/", s.handler.ShowIndexPage)
 	s.mockTokenManager.On("Validate", "valid-token").Return("testuser", nil)
@@ -148,7 +151,10 @@ func (s *UserHandlerTestSuite) TestPerformLoginSuccess() {
 		w.WriteHeader(http.StatusOK)
 		resp := &auth.LoginUserResponse{Token: "mock-jwt-token"}
 		body, _ := protojson.Marshal(resp)
-		w.Write(body)
+		_, err := w.Write(body)
+		if err != nil {
+			s.T().Fatalf("Failed to write response: %v", err)
+		}
 	}, nil)
 	s.router.POST(LoginPath, s.handler.PerformLogin)
 

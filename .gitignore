@@ -5,3 +5,6 @@ test.db
 
 # Files containing environment variables
 .env
+
+# Ignore executable files
+mqueue
