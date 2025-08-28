@@ -38,13 +38,13 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg := Config{}
-	ginMode := getEnv("GIN_MODE", "debug")
+	ginMode := getEnv("GIN_MODE", "release")
 	if ginMode != "debug" && ginMode != "release" {
 		return nil, fmt.Errorf("invalid GIN_MODE: %s, must be 'debug' or 'release'", ginMode)
 	}
 	cfg.GinMode = ginMode
 
-	cfg.Host = getEnv("HOST", "localhost") // For client connections
+	cfg.Host = getEnv("HOST", "localhost")
 	cfg.GRPCServerPort = getEnv("GRPC_SERVER_PORT", "9090")
 	cfg.GRPCGatewayPort = getEnv("GRPC_GATEWAY_PORT", "8081")
 	cfg.GinServerPort = getEnv("GIN_SERVER_PORT", "8080")
