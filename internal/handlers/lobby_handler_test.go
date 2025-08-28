@@ -67,7 +67,24 @@ func (s *LobbyHandlerTestSuite) TestCreateLobbySuccess() {
 	s.Equal("/lobbies/lobby-123", w.Header().Get("Location"))
 }
 
-func (s *LobbyHandlerTestSuite) TestCreateLobbyFailure() {
+func (s *LobbyHandlerTestSuite) TestCreateLobbyFailsWithEmptyName() {
+	s.setup(nil)
+	s.router.POST("/lobbies/create", s.handler.CreateLobby)
+
+	formData := url.Values{"name": {""}}
+	req, _ := http.NewRequest(http.MethodPost, "/lobbies/create", strings.NewReader(formData.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	w := httptest.NewRecorder()
+
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusBadRequest, w.Code)
+	s.Contains(w.Body.String(), "Lobby Creation Failed")
+	s.Contains(w.Body.String(), "Lobby name cannot be empty.")
+}
+
+func (s *LobbyHandlerTestSuite) TestCreateLobbyFailsWhenTheGatewayFails() {
 	s.setup(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
@@ -101,6 +118,22 @@ func (s *LobbyHandlerTestSuite) TestJoinLobbySuccess() {
 	s.Equal("/lobbies/lobby-456", w.Header().Get("Location"))
 }
 
+func (s *LobbyHandlerTestSuite) TestJoinLobbyGatewayFailure() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	s.router.POST("/lobbies/:lobby_id/join", s.handler.JoinLobby)
+
+	req, _ := http.NewRequest(http.MethodPost, "/lobbies/any-id/join", nil)
+	w := httptest.NewRecorder()
+
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusInternalServerError, w.Code)
+	s.Contains(w.Body.String(), "Join Lobby Failed")
+	s.Contains(w.Body.String(), "An unexpected error occurred while joining the lobby.")
+}
+
 func (s *LobbyHandlerTestSuite) TestGetLobbyPageSuccess() {
 	s.setup(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -116,6 +149,21 @@ func (s *LobbyHandlerTestSuite) TestGetLobbyPageSuccess() {
 
 	s.Equal(http.StatusOK, w.Code)
 	s.Contains(w.Body.String(), "The Best Lobby")
+}
+
+func (s *LobbyHandlerTestSuite) TestGetLobbyPageGatewayFailure() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	s.router.GET("/lobbies/:lobby_id", s.handler.GetLobbyPage)
+
+	req, _ := http.NewRequest(http.MethodGet, "/lobbies/any-id", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusInternalServerError, w.Code)
+	s.Contains(w.Body.String(), "Error Fetching Lobby")
+	s.Contains(w.Body.String(), "The server is currently unavailable.")
 }
 
 func (s *LobbyHandlerTestSuite) TestGetLobbyPageNotFound() {
@@ -147,6 +195,22 @@ func (s *LobbyHandlerTestSuite) TestFinishLobbySuccess() {
 
 	s.Equal(http.StatusOK, w.Code)
 	s.JSONEq(`{"lobby_id":"lobby-abc", "status":"Finished"}`, w.Body.String())
+}
+
+func (s *LobbyHandlerTestSuite) TestFinishLobbyGatewayFailure() {
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "database unavailable"}`))
+	})
+	s.router.PUT("/lobbies/:lobby_id/finish", s.handler.FinishLobby)
+
+	req, _ := http.NewRequest(http.MethodPut, "/lobbies/any-id/finish", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusInternalServerError, w.Code)
+	s.JSONEq(`{"error": "An unexpected error occurred"}`, w.Body.String())
 }
 
 func TestLobbyHandler(t *testing.T) {

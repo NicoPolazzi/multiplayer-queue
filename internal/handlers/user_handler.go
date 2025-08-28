@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	LoginPath = "/user/login"
+
 	LoginPageFilename    = "login.html"
 	RegisterPageFilename = "register.html"
 )
@@ -53,11 +55,15 @@ func (h *UserHandler) ShowIndexPage(c *gin.Context) {
 }
 
 func (h *UserHandler) ShowLoginPage(c *gin.Context) {
-	c.HTML(http.StatusOK, LoginPageFilename, nil)
+	c.HTML(http.StatusOK, LoginPageFilename, gin.H{
+		"title": "Login",
+	})
 }
 
 func (h *UserHandler) ShowRegisterPage(c *gin.Context) {
-	c.HTML(http.StatusOK, RegisterPageFilename, nil)
+	c.HTML(http.StatusOK, RegisterPageFilename, gin.H{
+		"title": "Register",
+	})
 }
 
 func (h *UserHandler) PerformLogin(c *gin.Context) {
@@ -111,7 +117,7 @@ func (h *UserHandler) PerformRegistration(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusSeeOther, "/user/login")
+	c.Redirect(http.StatusSeeOther, LoginPath)
 }
 
 func (h *UserHandler) PerformLogout(c *gin.Context) {

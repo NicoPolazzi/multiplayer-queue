@@ -25,7 +25,7 @@ func NewLobbyHandler(client *gateway.LobbyGatewayClient) *LobbyHandler {
 }
 
 func (h *LobbyHandler) CreateLobby(c *gin.Context) {
-	// Is ok to not check the existence of the user because this handler is protected with the authMiddleware
+	// Is ok to not check the existence of the user because this handler is protected by the authMiddleware
 	user, _ := middleware.UserFromContext(c)
 
 	lobbyName := c.PostForm("name")
@@ -114,13 +114,9 @@ func (h *LobbyHandler) FinishLobby(c *gin.Context) {
 	lobbyID := c.Param("lobby_id")
 
 	finishedLobby, err := h.lobbyClient.FinishLobby(c.Request.Context(), lobbyID)
-	if err != nil {
-		var apiErr *gateway.APIError
-		if errors.As(err, &apiErr) {
-			c.JSON(apiErr.StatusCode, gin.H{"error": apiErr.Message})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "An internal error occurred"})
+	var apiErr *gateway.APIError
+	if errors.As(err, &apiErr) {
+		c.JSON(apiErr.StatusCode, gin.H{"error": apiErr.Message})
 		return
 	}
 
