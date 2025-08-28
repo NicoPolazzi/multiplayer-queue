@@ -1,5 +1,12 @@
 {{ template "header.html" .}}
 
+{{ if .ErrorTitle }}
+<div class="alert alert-danger">
+    <strong>{{ .ErrorTitle }}</strong>
+    <p>{{ .ErrorMessage }}</p>
+</div>
+{{ end }}
+
 <div class="container mt-5">
     <h1>Lobby: {{ .lobby.Name }}</h1>
     <div class="card">

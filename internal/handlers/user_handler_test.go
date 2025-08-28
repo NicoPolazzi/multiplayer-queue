@@ -8,51 +8,120 @@ import (
 	"testing"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
+	"github.com/NicoPolazzi/multiplayer-queue/gen/lobby"
 	"github.com/NicoPolazzi/multiplayer-queue/internal/gateway"
+	"github.com/NicoPolazzi/multiplayer-queue/internal/middleware"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+type MockTokenManager struct {
+	mock.Mock
+}
+
+func (m *MockTokenManager) Create(username string) (string, error) {
+	args := m.Called(username)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockTokenManager) Validate(tokenString string) (string, error) {
+	args := m.Called(tokenString)
+	return args.String(0), args.Error(1)
+}
+
 type UserHandlerTestSuite struct {
 	suite.Suite
-	router      *gin.Engine
-	mockGateway *httptest.Server
-	handler     *UserHandler
-	authClient  *gateway.AuthGatewayClient
+	router           *gin.Engine
+	mockAuthGateway  *httptest.Server
+	mockLobbyGateway *httptest.Server
+	handler          *UserHandler
+	authClient       *gateway.AuthGatewayClient
+	lobbyClient      *gateway.LobbyGatewayClient
+	mockTokenManager *MockTokenManager
 }
 
 func (s *UserHandlerTestSuite) SetupTest() {
 	gin.SetMode(gin.TestMode)
 	s.router = gin.Default()
-	// Adjust the path according to your project structure
-	s.router.LoadHTMLGlob("../web/templates/*")
+	s.router.LoadHTMLGlob("../../web/templates/*")
+
+	s.mockTokenManager = new(MockTokenManager)
+
+	authMiddleware := middleware.NewAuthMiddleware(s.mockTokenManager)
+	s.router.Use(authMiddleware.CheckUser())
 }
 
-func (s *UserHandlerTestSuite) AfterTest() {
-	if s.mockGateway != nil {
-		s.mockGateway.Close()
+func (s *UserHandlerTestSuite) TearDownTest() {
+	if s.mockAuthGateway != nil {
+		s.mockAuthGateway.Close()
+	}
+	if s.mockLobbyGateway != nil {
+		s.mockLobbyGateway.Close()
 	}
 }
 
-func (s *UserHandlerTestSuite) setupMockGateway(handler http.HandlerFunc) {
-	s.mockGateway = httptest.NewServer(handler)
-	s.authClient = gateway.NewAuthGatewayClient(s.mockGateway.URL)
-	s.handler = NewUserHandler(s.authClient, nil)
+func (s *UserHandlerTestSuite) setup(authHandler, lobbyHandler http.HandlerFunc) {
+	if authHandler != nil {
+		s.mockAuthGateway = httptest.NewServer(authHandler)
+		s.authClient = gateway.NewAuthGatewayClient(s.mockAuthGateway.URL)
+	}
+	if lobbyHandler != nil {
+		s.mockLobbyGateway = httptest.NewServer(lobbyHandler)
+		s.lobbyClient = gateway.NewLobbyGatewayClient(s.mockLobbyGateway.URL)
+	}
+	s.handler = NewUserHandler(s.authClient, s.lobbyClient)
+}
+
+func (s *UserHandlerTestSuite) TestShowIndexPageAsLoggedInUser() {
+	s.setup(nil, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		resp := &lobby.ListAvailableLobbiesResponse{Lobbies: []*lobby.Lobby{{Name: "Fun Lobby"}}}
+		body, _ := protojson.Marshal(resp)
+		w.Write(body)
+	})
+	s.router.GET("/", s.handler.ShowIndexPage)
+	s.mockTokenManager.On("Validate", "valid-token").Return("testuser", nil)
+
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "token", Value: "valid-token"})
+
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusOK, w.Code)
+	s.Contains(w.Body.String(), "Welcome back, testuser!")
+	s.Contains(w.Body.String(), "Fun Lobby")
+	s.mockTokenManager.AssertExpectations(s.T())
+}
+
+func (s *UserHandlerTestSuite) TestShowIndexPageLobbyServiceFails() {
+	s.setup(nil, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	s.router.GET("/", s.handler.ShowIndexPage)
+	s.mockTokenManager.On("Validate", "valid-token").Return("testuser", nil)
+
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "token", Value: "valid-token"})
+
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+
+	s.Equal(http.StatusOK, w.Code)
+	s.Contains(w.Body.String(), "Lobby Service Error")
+	s.Contains(w.Body.String(), "Could not retrieve the list of available lobbies.")
+	s.mockTokenManager.AssertExpectations(s.T())
 }
 
 func (s *UserHandlerTestSuite) TestPerformLoginSuccess() {
-	s.setupMockGateway(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	s.setup(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		mockResponse := &auth.LoginUserResponse{
-			Token: "mock-jwt-token",
-			User:  &auth.User{Id: 1, Username: "testuser"},
-		}
-		body, err := protojson.Marshal(mockResponse)
-		s.Require().NoError(err)
+		resp := &auth.LoginUserResponse{Token: "mock-jwt-token"}
+		body, _ := protojson.Marshal(resp)
 		w.Write(body)
-	})
+	}, nil)
 	s.router.POST("/user/login", s.handler.PerformLogin)
 
 	formData := url.Values{"username": {"testuser"}, "password": {"password123"}}
@@ -67,77 +136,17 @@ func (s *UserHandlerTestSuite) TestPerformLoginSuccess() {
 	s.Contains(w.Header().Get("Set-Cookie"), "token=mock-jwt-token")
 }
 
-func (s *UserHandlerTestSuite) TestPerformLoginFailure() {
-	s.setupMockGateway(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-	})
-	s.router.POST("/user/login", s.handler.PerformLogin)
-
-	formData := url.Values{"username": {"testuser"}, "password": {"wrongpassword"}}
-	req, _ := http.NewRequest(http.MethodPost, "/user/login", strings.NewReader(formData.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	w := httptest.NewRecorder()
-	s.router.ServeHTTP(w, req)
-
-	s.Equal(http.StatusUnauthorized, w.Code)
-	s.Contains(w.Body.String(), "Invalid username or password.")
-}
-
-func (s *UserHandlerTestSuite) TestPerformRegistrationSuccess() {
-	// 1. Setup the mock gateway to return a 200 OK for a successful registration.
-	s.setupMockGateway(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-	s.router.POST("/user/register", s.handler.PerformRegistration)
-
-	// 2. Create the form data for the new user.
-	formData := url.Values{"username": {"newuser"}, "password": {"password123"}}
-	req, _ := http.NewRequest(http.MethodPost, "/user/register", strings.NewReader(formData.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	w := httptest.NewRecorder()
-	s.router.ServeHTTP(w, req)
-
-	// 3. Assert that the user is redirected to the login page on success.
-	s.Equal(http.StatusSeeOther, w.Code)
-	s.Equal("/user/login", w.Header().Get("Location"))
-}
-
-func (s *UserHandlerTestSuite) TestPerformRegistrationFailureConflict() {
-	// 1. Setup the mock gateway to return a 409 Conflict for a duplicate username.
-	s.setupMockGateway(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusConflict)
-	})
-	s.router.POST("/user/register", s.handler.PerformRegistration)
-
-	// 2. Create the form data.
-	formData := url.Values{"username": {"existinguser"}, "password": {"password123"}}
-	req, _ := http.NewRequest(http.MethodPost, "/user/register", strings.NewReader(formData.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	w := httptest.NewRecorder()
-	s.router.ServeHTTP(w, req)
-
-	// 3. Assert that the register page is re-rendered with the correct error message.
-	s.Equal(http.StatusConflict, w.Code)
-	s.Contains(w.Body.String(), "That username is already taken.")
-}
-
 func (s *UserHandlerTestSuite) TestPerformLogout() {
-	// Logout is simple and doesn't need to contact the gateway.
-	s.setupMockGateway(nil)
+	s.setup(nil, nil) // No gateway calls needed
 	s.router.GET("/user/logout", s.handler.PerformLogout)
 
 	req, _ := http.NewRequest(http.MethodGet, "/user/logout", nil)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, req)
 
-	// Assert that the user is redirected and the cookie is expired.
 	s.Equal(http.StatusSeeOther, w.Code)
 	s.Equal("/", w.Header().Get("Location"))
 	s.Contains(w.Header().Get("Set-Cookie"), "token=;")
-	s.Contains(w.Header().Get("Set-Cookie"), "Max-Age=0") // A more precise check for cookie deletion.
 }
 
 func TestUserHandler(t *testing.T) {

@@ -151,7 +151,7 @@ func (s *AuthServerTestSuite) TestLoginUserWhenUserNotFound() {
 	s.Empty(resp)
 	st, ok := status.FromError(err)
 	s.True(ok)
-	s.Equal(codes.NotFound, st.Code())
+	s.Equal(codes.Unauthenticated, st.Code())
 	s.Equal(st.Message(), "invalid credentials")
 	s.jwtManager.AssertNotCalled(s.T(), "Create", mock.Anything)
 }

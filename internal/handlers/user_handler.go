@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/NicoPolazzi/multiplayer-queue/gen/auth"
@@ -43,7 +42,6 @@ func (h *UserHandler) ShowIndexPage(c *gin.Context) {
 
 		lobbies, err := h.lobbyClient.ListAvailableLobbies(c.Request.Context())
 		if err != nil {
-			log.Printf("UserHandler: Could not load lobbies: %v", err)
 			data["ErrorTitle"] = "Lobby Service Error"
 			data["ErrorMessage"] = "Could not retrieve the list of available lobbies."
 		} else {

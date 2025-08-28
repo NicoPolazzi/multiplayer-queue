@@ -2,7 +2,6 @@ package lobby
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"strings"
 
@@ -67,7 +66,7 @@ func (s *LobbyService) JoinLobby(ctx context.Context, req *lobby.JoinLobbyReques
 	}
 
 	if len(lobbyToJoin.Players) >= 2 {
-		return nil, errors.New("lobby is full")
+		return nil, status.Errorf(codes.FailedPrecondition, "lobby is full")
 	}
 
 	if err := s.lobbyRepo.AddPlayer(lobbyToJoin, player); err != nil {

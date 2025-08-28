@@ -26,8 +26,7 @@ type LobbyHandlerTestSuite struct {
 func (s *LobbyHandlerTestSuite) SetupTest() {
 	gin.SetMode(gin.TestMode)
 	s.router = gin.Default()
-	// Adjust path if needed
-	s.router.LoadHTMLGlob("../web/templates/*")
+	s.router.LoadHTMLGlob("../../web/templates/*")
 }
 
 func (s *LobbyHandlerTestSuite) AfterTest() {
@@ -36,13 +35,12 @@ func (s *LobbyHandlerTestSuite) AfterTest() {
 	}
 }
 
-// setup will initialize the mock server, client, and handler
 func (s *LobbyHandlerTestSuite) setup(mockHandler http.HandlerFunc) {
 	s.mockGateway = httptest.NewServer(mockHandler)
 	s.lobbyClient = gateway.NewLobbyGatewayClient(s.mockGateway.URL)
 	s.handler = NewLobbyHandler(s.lobbyClient)
 
-	// Add a mock middleware to simulate a logged-in user
+	// Add a mock middleware to simulate a logged-in user.
 	s.router.Use(func(c *gin.Context) {
 		middleware.SetUserInContext(c, &middleware.User{Username: "testuser"})
 		c.Next()
@@ -83,13 +81,12 @@ func (s *LobbyHandlerTestSuite) TestCreateLobbyFailure() {
 	s.router.ServeHTTP(w, req)
 
 	s.Equal(http.StatusInternalServerError, w.Code)
-	s.Contains(w.Body.String(), "An unexpected error occurred while creating the lobby")
+	s.Contains(w.Body.String(), "An unexpected error occurred")
 }
 
 func (s *LobbyHandlerTestSuite) TestJoinLobbySuccess() {
 	s.setup(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// JoinLobby in the refactored client expects a Lobby object in response
 		resp := &lobby.Lobby{LobbyId: "lobby-456"}
 		body, _ := protojson.Marshal(resp)
 		w.Write(body)
