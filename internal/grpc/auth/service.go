@@ -83,10 +83,6 @@ func (s *AuthService) LoginUser(ctx context.Context, req *auth.LoginUserRequest)
 }
 
 func toProtoUser(user *models.User) *auth.User {
-	if user == nil {
-		return nil
-	}
-
 	return &auth.User{
 		Id:       uint32(user.ID),
 		Username: user.Username,
