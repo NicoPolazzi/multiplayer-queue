@@ -20,10 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// The program sets an http server using GIN to handle user requests. There requests are then translated by a gRPC
-// gateway in RPCs handled by a gRPC server. Two gRPC services are available: auth and lobby. The former handles user
-// authentication tasks, such as login and registration. The latter handles all lobby related task, such as the
-// creation and the joining in a lobby.
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -150,7 +147,6 @@ func runGinServer(ctx context.Context, container *AppContainer, cfg *Config) err
 		Handler: router,
 	}
 
-	// Start a goroutine to listen for the context cancellation.
 	go func() {
 		<-ctx.Done()
 		log.Println("Shutting down Gin server...")
